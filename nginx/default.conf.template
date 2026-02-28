@@ -1,11 +1,13 @@
-load_module modules/ngx_http_js_module.so;
-
 js_import orchestrator from /etc/nginx/njs/orchestrator.js;
 js_var $guardrails_upstream ${GUARDRAILS_UPSTREAM};
+js_fetch_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
 
 server {
     listen ${NGINX_LISTEN_PORT};
     server_name _;
+
+    resolver 127.0.0.11 8.8.8.8 ipv6=off valid=30s;
+    resolver_timeout 5s;
 
     root /usr/share/nginx/html;
     index index.html;
@@ -39,6 +41,9 @@ server {
 
     # SSE orchestrator endpoints
     location = /inline/chat {
+        client_body_in_single_buffer on;
+        client_body_buffer_size 64k;
+        client_max_body_size 64k;
         js_content orchestrator.inlineChat;
         proxy_buffering off;
         sendfile off;
@@ -47,6 +52,9 @@ server {
     }
 
     location = /oob/chat {
+        client_body_in_single_buffer on;
+        client_body_buffer_size 64k;
+        client_max_body_size 64k;
         js_content orchestrator.oobChat;
         proxy_buffering off;
         sendfile off;

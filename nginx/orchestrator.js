@@ -1,13 +1,7 @@
 var OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 function sendSSE(r, data) {
-  r.sendBuffer("event: stage\ndata: " + JSON.stringify(data) + "\n\n", {
-    last: false,
-  });
-}
-
-function endSSE(r) {
-  r.sendBuffer("", { last: true });
+  r.send("event: stage\ndata: " + JSON.stringify(data) + "\n\n");
 }
 
 function initSSE(r) {
@@ -34,7 +28,9 @@ function isBlocked(guardrailPayload) {
 
 function parseBody(r) {
   try {
-    return JSON.parse(r.requestBody);
+    var raw = r.requestText || r.requestBody || "";
+    if (!raw) return null;
+    return JSON.parse(raw);
   } catch (e) {
     return null;
   }
@@ -74,7 +70,7 @@ async function oobChat(r) {
   var body = parseBody(r);
   if (!body) {
     sendSSE(r, { stage: "error", message: "Invalid JSON body" });
-    endSSE(r);
+    r.finish();
     return;
   }
 
@@ -95,7 +91,7 @@ async function oobChat(r) {
     if (isBlocked(guardrail)) {
       sendSSE(r, { stage: "blocked", reason: "pre-scan blocked" });
       sendSSE(r, { stage: "done" });
-      endSSE(r);
+      r.finish();
       return;
     }
 
@@ -120,7 +116,7 @@ async function oobChat(r) {
     sendSSE(r, { stage: "error", message: String(e.message || e) });
   }
 
-  endSSE(r);
+  r.finish();
 }
 
 async function inlineChat(r) {
@@ -129,7 +125,7 @@ async function inlineChat(r) {
   var body = parseBody(r);
   if (!body) {
     sendSSE(r, { stage: "error", message: "Invalid JSON body" });
-    endSSE(r);
+    r.finish();
     return;
   }
 
@@ -150,7 +146,7 @@ async function inlineChat(r) {
     if (isBlocked(guardrail)) {
       sendSSE(r, { stage: "blocked", reason: "pre-scan blocked" });
       sendSSE(r, { stage: "done" });
-      endSSE(r);
+      r.finish();
       return;
     }
 
@@ -185,7 +181,7 @@ async function inlineChat(r) {
     sendSSE(r, { stage: "error", message: String(e.message || e) });
   }
 
-  endSSE(r);
+  r.finish();
 }
 
 export default { inlineChat, oobChat };

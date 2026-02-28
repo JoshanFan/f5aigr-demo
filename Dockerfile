@@ -1,7 +1,8 @@
 FROM nginx:alpine
 
-# Install njs module
-RUN apk add --no-cache nginx-mod-http-js
+# Install njs module and load it in main nginx.conf
+RUN apk add --no-cache nginx-module-njs ca-certificates \
+ && sed -i '1s|^|load_module modules/ngx_http_js_module.so;\n|' /etc/nginx/nginx.conf
 
 # Remove default nginx page
 RUN rm -rf /usr/share/nginx/html/*

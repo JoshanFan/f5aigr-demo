@@ -1,7 +1,13 @@
 FROM nginx:alpine
 
+# Install njs module
+RUN apk add --no-cache nginx-mod-http-js
+
 # Remove default nginx page
 RUN rm -rf /usr/share/nginx/html/*
+
+# Copy njs orchestrator
+COPY nginx/orchestrator.js /etc/nginx/njs/orchestrator.js
 
 # Copy frontend static files
 COPY index.html    /usr/share/nginx/html/

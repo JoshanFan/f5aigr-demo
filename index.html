@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>F5 Al Guardrail Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <div class="bg-grid" aria-hidden="true"></div>
+
+    <div class="app-shell">
+      <header class="panel header-panel">
+        <div>
+          <p class="eyebrow">F5 SECURITY OPS</p>
+          <h1>F5 Al Guardrail Demo</h1>
+        </div>
+      </header>
+
+      <main id="main">
+        <!-- Settings -->
+        <section class="panel settings-panel">
+          <div class="section-head">
+            <h2>Settings</h2>
+            <p id="settingsState">Save credentials to start connection monitor</p>
+          </div>
+
+          <div class="settings-row">
+            <label class="field field--grow">
+              <span>Project ID</span>
+              <input
+                id="projectId"
+                type="text"
+                value=""
+                placeholder="project-app-xxxxxxxx"
+                autocomplete="off"
+              />
+            </label>
+            <label class="field field--grow">
+              <span>API Token</span>
+              <input
+                id="apiToken"
+                type="password"
+                value=""
+                placeholder="Paste Guardrails Bearer token"
+                autocomplete="off"
+              />
+            </label>
+            <div class="field field--connection">
+              <span>Connection</span>
+              <div class="connection-pill">
+                <span>Status</span>
+                <strong id="connectionState">Not Connected</strong>
+              </div>
+            </div>
+            <button id="saveSettingsBtn" class="btn-primary" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+              </svg>
+              Save
+            </button>
+          </div>
+        </section>
+
+        <!-- Analytics -->
+        <section class="panel analytics-panel">
+          <div class="section-head">
+            <h2>Analytics</h2>
+            <p>Live guardrail telemetry</p>
+          </div>
+
+          <div class="kpi-grid">
+            <article class="kpi-card">
+              <h3>Requests Scanned</h3>
+              <p class="kpi-value" id="kpiRequests">0</p>
+              <p class="kpi-trend is-up" id="kpiRequestsTrend">Session</p>
+            </article>
+
+            <article class="kpi-card">
+              <h3>Blocked Prompts</h3>
+              <p class="kpi-value" id="kpiBlocked">0</p>
+              <p class="kpi-trend is-warn" id="kpiBlockedTrend">0.0% block rate</p>
+            </article>
+
+            <article class="kpi-card">
+              <h3>Reviews Raised</h3>
+              <p class="kpi-value" id="kpiReviewCount">0</p>
+              <p class="kpi-trend is-down" id="kpiReviewTrend">0.0% review rate</p>
+            </article>
+
+            <article class="kpi-card">
+              <h3>Policy Pass Rate</h3>
+              <p class="kpi-value" id="kpiPassRate">0.0%</p>
+              <p class="kpi-trend is-down" id="kpiPassTrend">Stable</p>
+            </article>
+          </div>
+        </section>
+
+        <!-- Operation Mode -->
+        <section class="panel mode-panel">
+          <div class="section-head" style="margin-bottom: 14px;">
+            <h2>Operation Mode</h2>
+          </div>
+
+          <div class="mode-row" role="tablist" aria-label="Operation mode switch">
+            <button
+              type="button"
+              class="mode-btn is-active"
+              data-mode="inline"
+              role="tab"
+              aria-selected="true"
+            >
+              <div class="mode-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+              </div>
+              <span class="mode-copy">Inline &bull; Real-time request enforcement</span>
+            </button>
+
+            <button type="button" class="mode-btn" data-mode="oob" role="tab" aria-selected="false">
+              <div class="mode-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <circle cx="12" cy="12" r="6"></circle>
+                  <circle cx="12" cy="12" r="2"></circle>
+                </svg>
+              </div>
+              <span class="mode-copy">Out-of-Band &bull; Async monitor and feedback</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Architecture Flow -->
+        <section class="panel flow-panel">
+          <div class="section-head">
+            <h2>Architecture Flow</h2>
+            <p id="flowModeLabel">Inline flow architecture</p>
+          </div>
+
+          <div class="flow-board" id="flowBoard" data-mode="inline">
+            <!-- ── INLINE DIAGRAM ── -->
+            <div class="flow-diagram flow-diagram--inline" data-diagram="inline" aria-label="Inline architecture">
+              <p class="diagram-tag">ARCHITECTURE FLOW · INLINE</p>
+
+              <div class="flow-lane flow-lane--request">
+                <div class="flow-node flow-node--chatbot" data-node="i-chatbot">CHATBOT</div>
+
+                <div class="flow-conn">
+                  <div class="flow-step">
+                    <div class="step-circle step-circle--request" data-node="i-n1">1</div>
+                    <svg class="flow-arrow flow-arrow--request" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  </div>
+                  <div class="flow-step">
+                    <div class="step-circle step-circle--response" data-node="i-n6">6</div>
+                    <svg class="flow-arrow flow-arrow--response" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                  </div>
+                </div>
+
+                <div class="flow-node flow-node--nginx" data-node="i-nginx">NGINX</div>
+
+                <div class="flow-conn">
+                  <div class="flow-step">
+                    <div class="step-circle step-circle--request" data-node="i-n2">2</div>
+                    <svg class="flow-arrow flow-arrow--request" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  </div>
+                  <div class="flow-step">
+                    <div class="step-circle step-circle--response" data-node="i-n5">5</div>
+                    <svg class="flow-arrow flow-arrow--response" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                  </div>
+                </div>
+
+                <div class="flow-core" data-node="i-core">
+                  <p>F5 AI GUARDRAILS</p>
+                  <div class="flow-node flow-node--scanner" data-node="i-scanner">SCANER</div>
+                </div>
+
+                <div class="flow-conn">
+                  <div class="flow-step">
+                    <div class="step-circle step-circle--request" data-node="i-n3">3</div>
+                    <svg class="flow-arrow flow-arrow--request" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  </div>
+                  <div class="flow-step">
+                    <div class="step-circle step-circle--response" data-node="i-n4">4</div>
+                    <svg class="flow-arrow flow-arrow--response" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                  </div>
+                </div>
+
+                <div class="flow-node flow-node--llm" data-node="i-llm">LLM Inference</div>
+              </div>
+
+              <div class="flow-notes">
+                <span class="flow-note flow-note--warn">Blocked -> return safe generated response</span>
+                <span class="flow-note flow-note--ok">Allow -> audited response back to frontend</span>
+              </div>
+
+              <div class="flow-legend">
+                <span class="legend-pill legend-pill--request">
+                  <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  REQUEST PATH
+                </span>
+                <span class="legend-pill legend-pill--response">
+                  <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                  RESPONSE PATH
+                </span>
+              </div>
+            </div>
+
+            <!-- ── OOB DIAGRAM ── -->
+            <div class="flow-diagram flow-diagram--oob" data-diagram="oob" aria-label="Out-of-band architecture">
+              <p class="diagram-tag">ARCHITECTURE FLOW · OUT-OF-BAND</p>
+
+              <div class="oob-scan-row">
+                <div class="oob-scan-core" data-node="o-core">
+                  <p>F5 AI GUARDRAILS</p>
+                  <div class="oob-scan-engine" data-node="o-scanner">SCANER</div>
+                  <span class="oob-scan-hint">async verdict returned to backend</span>
+                </div>
+              </div>
+
+              <div class="flow-bridge">
+                <span class="flow-bridge-label">prompt mirror</span>
+                <svg class="flow-arrow flow-arrow--async" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+                <div class="step-circle step-circle--async" data-node="o-n4">4</div>
+                <svg class="flow-arrow flow-arrow--async" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12 19V5M19 12l-7 7-7-7"/></svg>
+                <span class="flow-bridge-label">scan verdict</span>
+              </div>
+
+              <div class="flow-lane flow-lane--request">
+                <div class="flow-node flow-node--chatbot" data-node="o-chatbot">CHATBOT</div>
+
+                <div class="flow-conn">
+                  <div class="flow-step">
+                    <div class="step-circle step-circle--request" data-node="o-n1">1</div>
+                    <svg class="flow-arrow flow-arrow--request" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  </div>
+                  <div class="flow-step">
+                    <div class="step-circle step-circle--response" data-node="o-n6">6</div>
+                    <svg class="flow-arrow flow-arrow--response" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                  </div>
+                </div>
+
+                <div class="flow-node flow-node--nginx" data-node="o-nginx">NGINX</div>
+
+                <div class="flow-conn">
+                  <div class="flow-step">
+                    <div class="step-circle step-circle--request" data-node="o-n2">2</div>
+                    <svg class="flow-arrow flow-arrow--request" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  </div>
+                  <div class="flow-step">
+                    <div class="step-circle step-circle--response" data-node="o-n5">5</div>
+                    <svg class="flow-arrow flow-arrow--response" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                  </div>
+                </div>
+
+                <div class="flow-node flow-node--llm" data-node="o-llm">LLM Inference</div>
+              </div>
+
+              <div class="flow-notes">
+                <span class="flow-note flow-note--warn">Blocked -> backend returns generated safe response</span>
+                <span class="flow-note flow-note--ok">Cleared -> backend triggers LLM request</span>
+              </div>
+
+              <div class="flow-legend">
+                <span class="legend-pill legend-pill--request">
+                  <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  REQUEST PATH
+                </span>
+                <span class="legend-pill legend-pill--response">
+                  <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                  RESPONSE PATH
+                </span>
+                <span class="legend-pill legend-pill--async">
+                  <svg viewBox="0 0 24 24"><path d="M6 3v12M18 9a3 3 0 0 1 0 6H9"/></svg>
+                  ASYNC OOB PATH
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Prompt & Result -->
+        <section class="panel prompt-result-grid" style="background: transparent; border-color: transparent; padding: 0;">
+          <div class="left-col">
+            <!-- Prompt Tester -->
+            <div class="panel prompt-panel">
+              <div class="section-head" style="margin-bottom: 14px;">
+                <h2>Prompt Tester</h2>
+              </div>
+
+              <label class="field">
+                <textarea
+                  id="promptInput"
+                  rows="6"
+                  placeholder="Type a prompt or use preset 1-4 to test different risk scenarios..."
+                ></textarea>
+              </label>
+
+              <div class="prompt-actions">
+                <button id="scanBtn" class="scan-btn" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.3-4.3"></path>
+                    <path d="M11 8v6"></path>
+                    <path d="M8 11h6"></path>
+                  </svg>
+                  <span class="scan-label">Run Guardrail Scan</span>
+                  <span class="scan-spinner" aria-hidden="true"></span>
+                </button>
+                <span id="scanState" class="scan-state">Idle</span>
+              </div>
+            </div>
+
+            <!-- Adversarial Test Samples -->
+            <div class="panel scenario-panel">
+              <div class="section-head" style="margin-bottom: 14px;">
+                <h2>Adversarial Test Samples</h2>
+              </div>
+
+              <div class="scenario-grid" id="scenarioGrid">
+                <button class="scenario-card level-low is-active" data-scenario="1" type="button">
+                  <span class="scenario-text">1. Benign Translation
+Low Risk</span>
+                </button>
+
+                <button class="scenario-card level-medium" data-scenario="2" type="button">
+                  <span class="scenario-text">2. Prompt Injection
+Medium Risk</span>
+                </button>
+
+                <button class="scenario-card level-high" data-scenario="3" type="button">
+                  <span class="scenario-text">3. Credential Exfiltration
+High Risk</span>
+                </button>
+
+                <button class="scenario-card level-medium" data-scenario="4" type="button">
+                  <span class="scenario-text">4. Jailbreak Chain
+Medium Risk</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Result -->
+          <div class="panel result-zone">
+            <div class="section-head" style="margin-bottom: 14px;">
+              <h2>Result</h2>
+            </div>
+
+            <div class="result-tabs" role="tablist" aria-label="Result tabs">
+              <button
+                id="resultTabSummary"
+                class="result-tab is-active"
+                type="button"
+                role="tab"
+                aria-controls="resultPanelSummary"
+                aria-selected="true"
+              >
+                Summary
+              </button>
+              <button
+                id="resultTabJson"
+                class="result-tab"
+                type="button"
+                role="tab"
+                aria-controls="resultPanelJson"
+                aria-selected="false"
+              >
+                Raw JSON
+              </button>
+            </div>
+
+            <section id="resultPanelSummary" class="result-panel-content is-active" role="tabpanel">
+              <div class="result-row">
+                <span>Verdict</span>
+                <strong id="verdictBadge" class="risk-badge risk-low">Pending</strong>
+              </div>
+
+              <div class="result-row">
+                <span>Outcome</span>
+                <strong id="resultOutcome">unknown</strong>
+              </div>
+
+              <div class="result-row">
+                <span>Scanners</span>
+                <strong id="scannerSummary">0 flagged / 0 total</strong>
+              </div>
+
+              <div class="scanner-details" id="scannerDetails">
+                <span class="scanner-details-label">Scanner Breakdown</span>
+                <div class="scanner-list" id="scannerList">
+                  <p class="scanner-empty">Run a scan to view scanner results.</p>
+                </div>
+              </div>
+
+              <div class="result-preview">
+                <span id="contextPreviewLabel">Context Preview</span>
+                <p id="contextPreview">Awaiting first API scan.</p>
+              </div>
+            </section>
+
+            <section id="resultPanelJson" class="result-panel-content" role="tabpanel" hidden>
+              <div class="raw-json-box">
+                <span>Raw JSON</span>
+                <pre id="rawJsonOutput" class="raw-json">{
+  "message": "Run a real scan to view raw JSON response."
+}</pre>
+              </div>
+            </section>
+
+            <div class="result-row" style="display: none;">
+              <span>Request ID</span>
+              <strong id="requestId">--</strong>
+            </div>
+            <div class="result-row" style="display: none;">
+              <span id="detailLabel">Detail</span>
+              <strong id="detailValue">--</strong>
+            </div>
+            <div class="result-row" style="display: none;">
+              <span>Source Type</span>
+              <strong id="apiPath">--</strong>
+            </div>
+            <div class="result-row result-row--threats" style="display: none;">
+              <span>Threats</span>
+              <ul id="threatList">
+                <li>Run a real scan to view API result.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

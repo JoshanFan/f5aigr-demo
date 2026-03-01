@@ -13,14 +13,18 @@ const state = {
   isScanning: false,
   resultTab: "summary",
   selectedScenario: "1",
+  flowRunId: 0,
+  flowBlocked: false,
   connectionMonitorId: null,
   connectionCheckInFlight: false,
-  metrics: {
-    totalScans: 0,
-    blockedCount: 0,
-    allowCount: 0,
-    reviewCount: 0,
+  analytics: {
+    entries: [],
+    lastBlocked: null,
+    lastEntry: null,
+    lastRawJson: "{\n  \"message\": \"Run a real scan to capture payload.\"\n}",
+    lastStageTrace: [],
   },
+  oobGuardrailDetected: false,
 };
 
 const scenarios = {
@@ -42,6 +46,13 @@ const modeDescriptions = {
   inline: "Inline flow architecture",
   oob: "Out-of-Band flow architecture",
 };
+
+const INLINE_FLOW_STEP_TOTAL = 6;
+const OOB_FLOW_STEP_TOTAL = 6;
+const ANALYTICS_HISTORY_LIMIT = 40;
+const SSE_TOTAL_TIMEOUT_MS = 90000;
+const SSE_IDLE_TIMEOUT_MS = 25000;
+let copyJsonResetTimerId = null;
 
 const dom = {
   projectId: document.getElementById("projectId"),
@@ -69,6 +80,7 @@ const dom = {
   resultPanelSummary: document.getElementById("resultPanelSummary"),
   resultPanelJson: document.getElementById("resultPanelJson"),
   rawJsonOutput: document.getElementById("rawJsonOutput"),
+  copyRawJsonBtn: document.getElementById("copyRawJsonBtn"),
   scannerList: document.getElementById("scannerList"),
   openrouterKey: document.getElementById("openrouterKey"),
   llmModel: document.getElementById("llmModel"),
@@ -77,14 +89,27 @@ const dom = {
   llmResponseModel: document.getElementById("llmResponseModel"),
   connectionState: document.getElementById("connectionState"),
   scenarioGrid: document.getElementById("scenarioGrid"),
-  kpiRequests: document.getElementById("kpiRequests"),
-  kpiRequestsTrend: document.getElementById("kpiRequestsTrend"),
-  kpiBlocked: document.getElementById("kpiBlocked"),
-  kpiBlockedTrend: document.getElementById("kpiBlockedTrend"),
-  kpiReviewCount: document.getElementById("kpiReviewCount"),
-  kpiReviewTrend: document.getElementById("kpiReviewTrend"),
-  kpiPassRate: document.getElementById("kpiPassRate"),
-  kpiPassTrend: document.getElementById("kpiPassTrend"),
+  demoDecisionBadge: document.getElementById("demoDecisionBadge"),
+  demoDecisionSummary: document.getElementById("demoDecisionSummary"),
+  demoDecisionMode: document.getElementById("demoDecisionMode"),
+  demoDecisionRequestId: document.getElementById("demoDecisionRequestId"),
+  demoDecisionLatency: document.getElementById("demoDecisionLatency"),
+  demoDecisionOutcome: document.getElementById("demoDecisionOutcome"),
+  metricE2EP95: document.getElementById("metricE2EP95"),
+  metricBlockRate: document.getElementById("metricBlockRate"),
+  metricErrorRate: document.getElementById("metricErrorRate"),
+  timelineSummary: document.getElementById("timelineSummary"),
+  incidentTimeline: document.getElementById("incidentTimeline"),
+  whyBlockedStatus: document.getElementById("whyBlockedStatus"),
+  whyBlockedRequestId: document.getElementById("whyBlockedRequestId"),
+  whyBlockedMode: document.getElementById("whyBlockedMode"),
+  whyBlockedLatency: document.getElementById("whyBlockedLatency"),
+  whyBlockedReason: document.getElementById("whyBlockedReason"),
+  whyBlockedPolicy: document.getElementById("whyBlockedPolicy"),
+  whyBlockedSnippet: document.getElementById("whyBlockedSnippet"),
+  whyBlockedScanners: document.getElementById("whyBlockedScanners"),
+  engineerStageTrace: document.getElementById("engineerStageTrace"),
+  engineerRawJson: document.getElementById("engineerRawJson"),
 };
 
 function saveSettings() {
@@ -153,6 +178,9 @@ function setMode(mode) {
     return;
   }
 
+  state.flowRunId += 1;
+  state.flowBlocked = false;
+  state.oobGuardrailDetected = false;
   state.mode = mode;
   dom.flowBoard.dataset.mode = mode;
   dom.flowModeLabel.textContent = modeDescriptions[mode];
@@ -164,6 +192,7 @@ function setMode(mode) {
   });
 
   clearFlowHighlights();
+  applyOobGuardrailDetectionVisual(false);
 }
 
 function applyScenario(id) {
@@ -268,6 +297,78 @@ function renderRawJson(payload) {
     : (() => { try { return JSON.stringify(payload, null, 2); } catch (_e) { return "{\n  \"message\": \"Unable to render payload\"\n}"; } })();
 
   dom.rawJsonOutput.textContent = text;
+  state.analytics.lastRawJson = text;
+  if (dom.engineerRawJson) {
+    dom.engineerRawJson.textContent = text;
+  }
+}
+
+async function copyTextToClipboard(text) {
+  const fallbackCopy = () => {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    area.style.pointerEvents = "none";
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    const success = document.execCommand("copy");
+    document.body.removeChild(area);
+    if (!success) {
+      throw new Error("Clipboard copy failed.");
+    }
+  };
+
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (_error) {
+      // Fallback for blocked clipboard permissions in non-secure or restricted contexts.
+      fallbackCopy();
+      return;
+    }
+  }
+
+  fallbackCopy();
+}
+
+function resetCopyJsonButton(delayMs = 1200) {
+  if (!dom.copyRawJsonBtn) return;
+  if (copyJsonResetTimerId) {
+    window.clearTimeout(copyJsonResetTimerId);
+  }
+  copyJsonResetTimerId = window.setTimeout(() => {
+    if (!dom.copyRawJsonBtn) return;
+    dom.copyRawJsonBtn.textContent = "Copy";
+    dom.copyRawJsonBtn.disabled = false;
+    copyJsonResetTimerId = null;
+  }, delayMs);
+}
+
+async function handleCopyRawJson() {
+  if (!dom.copyRawJsonBtn || !dom.rawJsonOutput) {
+    return;
+  }
+
+  const content = String(dom.rawJsonOutput.textContent || "").trim();
+  if (!content) {
+    dom.copyRawJsonBtn.textContent = "Empty";
+    dom.copyRawJsonBtn.disabled = true;
+    resetCopyJsonButton();
+    return;
+  }
+
+  dom.copyRawJsonBtn.disabled = true;
+  try {
+    await copyTextToClipboard(content);
+    dom.copyRawJsonBtn.textContent = "Copied";
+  } catch (_error) {
+    dom.copyRawJsonBtn.textContent = "Failed";
+  }
+  resetCopyJsonButton();
 }
 
 function setResultTab(tab) {
@@ -301,38 +402,766 @@ function renderApiError(message) {
   });
 }
 
-function updateAnalytics(result) {
-  const metrics = state.metrics;
-  metrics.totalScans += 1;
-
-  if (result.verdict === "Block") {
-    metrics.blockedCount += 1;
+function formatDuration(ms) {
+  if (!Number.isFinite(ms)) {
+    return "--";
   }
-  if (result.verdict === "Allow") {
-    metrics.allowCount += 1;
+  return `${Math.max(0, Math.round(ms))} ms`;
+}
+
+function formatPercent(numerator, denominator) {
+  if (!Number.isFinite(denominator) || denominator <= 0) {
+    return "--";
   }
-  if (result.verdict === "Review") {
-    metrics.reviewCount += 1;
+  return `${((Math.max(0, numerator) / denominator) * 100).toFixed(1)}%`;
+}
+
+function formatEventTime(epochMs) {
+  if (!Number.isFinite(epochMs)) {
+    return "--:--:--";
+  }
+  return new Date(epochMs).toLocaleTimeString();
+}
+
+function toVerdictLevel(verdict) {
+  const normalized = String(verdict || "").toLowerCase();
+  if (normalized === "allow") return "low";
+  if (normalized === "review") return "medium";
+  return "high";
+}
+
+function truncateText(text, maxLength = 160) {
+  if (typeof text !== "string") return "--";
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return "--";
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+function percentile(values, p) {
+  if (!Array.isArray(values) || values.length === 0) {
+    return null;
+  }
+  const sorted = values
+    .filter((value) => Number.isFinite(value))
+    .slice()
+    .sort((a, b) => a - b);
+  if (sorted.length === 0) {
+    return null;
+  }
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor((p / 100) * sorted.length) - 1));
+  return sorted[index];
+}
+
+function buildScannerEvidence(result) {
+  const scannerResults = Array.isArray(result?.scannerResults) ? result.scannerResults : [];
+  const scannerCatalog = result?.scannerCatalog && typeof result.scannerCatalog === "object" ? result.scannerCatalog : {};
+  const entries = [];
+
+  scannerResults.forEach((scanner) => {
+    const outcome = String(scanner?.outcome || "").toLowerCase();
+    if (["passed", "pass", "informational", "cleared", "allow", "allowed"].includes(outcome)) {
+      return;
+    }
+    const name = resolveScannerName(scanner, scannerCatalog);
+    const reason =
+      scanner?.data?.reason ||
+      scanner?.data?.message ||
+      scanner?.data?.label ||
+      scanner?.data?.type ||
+      "";
+    entries.push({
+      name,
+      outcome: outcome || "unknown",
+      reason: reason ? String(reason) : "",
+    });
+  });
+
+  return entries;
+}
+
+function createAnalyticsEntryFromResult(result, mode, durationMs, eventTime) {
+  const verdict = String(result?.verdict || "Error");
+  return {
+    time: Number.isFinite(eventTime) ? eventTime : Date.now(),
+    mode,
+    verdict,
+    outcome: String(result?.meta?.outcome || "unknown"),
+    durationMs: Number.isFinite(durationMs) ? durationMs : null,
+    requestId: result?.meta?.requestId || "--",
+    reasons: Array.isArray(result?.threats) ? result.threats.slice(0, 3) : [],
+    scannerEvidence: buildScannerEvidence(result),
+  };
+}
+
+function createAnalyticsEntryFromError(errorMessage, mode, durationMs, eventTime) {
+  const msg = typeof errorMessage === "string" && errorMessage.trim()
+    ? errorMessage.trim()
+    : "Unknown error";
+  return {
+    time: Number.isFinite(eventTime) ? eventTime : Date.now(),
+    mode,
+    verdict: "Error",
+    outcome: "error",
+    durationMs: Number.isFinite(durationMs) ? durationMs : null,
+    requestId: "--",
+    reasons: [msg],
+    scannerEvidence: [],
+  };
+}
+
+function renderDecisionHero(entry) {
+  if (!dom.demoDecisionBadge) return;
+
+  if (!entry) {
+    dom.demoDecisionBadge.textContent = "Pending";
+    dom.demoDecisionBadge.classList.remove("risk-low", "risk-medium", "risk-high");
+    dom.demoDecisionBadge.classList.add("risk-low");
+    dom.demoDecisionSummary.textContent = "Run a scan to capture guardrail evidence.";
+    dom.demoDecisionMode.textContent = "--";
+    dom.demoDecisionRequestId.textContent = "--";
+    dom.demoDecisionLatency.textContent = "--";
+    dom.demoDecisionOutcome.textContent = "--";
+    return;
   }
 
-  const blockRate = (metrics.blockedCount / metrics.totalScans) * 100;
-  const passRate = (metrics.allowCount / metrics.totalScans) * 100;
-  const reviewRate = (metrics.reviewCount / metrics.totalScans) * 100;
+  const verdict = String(entry.verdict || "Pending");
+  const level = toVerdictLevel(verdict);
+  dom.demoDecisionBadge.textContent = verdict.toUpperCase();
+  dom.demoDecisionBadge.classList.remove("risk-low", "risk-medium", "risk-high");
+  dom.demoDecisionBadge.classList.add(`risk-${level}`);
 
-  dom.kpiRequests.textContent = metrics.totalScans.toLocaleString();
-  dom.kpiRequestsTrend.textContent = `Mode: ${state.mode.toUpperCase()}`;
-  dom.kpiBlocked.textContent = metrics.blockedCount.toLocaleString();
-  dom.kpiBlockedTrend.textContent = `${blockRate.toFixed(1)}% block rate`;
-  dom.kpiReviewCount.textContent = metrics.reviewCount.toLocaleString();
-  dom.kpiReviewTrend.textContent = `${reviewRate.toFixed(1)}% review rate`;
-  dom.kpiPassRate.textContent = `${passRate.toFixed(1)}%`;
-  dom.kpiPassTrend.textContent = `${metrics.allowCount}/${metrics.totalScans} allow`;
+  if (verdict === "Block") {
+    dom.demoDecisionSummary.textContent = `Blocked by guardrail: ${truncateText(entry.reasons[0] || entry.scannerEvidence[0]?.reason || "Policy violation detected.", 148)}`;
+  } else if (verdict === "Allow") {
+    dom.demoDecisionSummary.textContent = "Allowed request. No high-risk scanner signal detected.";
+  } else if (verdict === "Error") {
+    dom.demoDecisionSummary.textContent = `Pipeline error: ${truncateText(entry.reasons[0] || "Unknown error", 148)}`;
+  } else {
+    dom.demoDecisionSummary.textContent = truncateText(entry.reasons[0] || "Decision requires further review.", 148);
+  }
+
+  dom.demoDecisionMode.textContent = (entry.mode || "--").toUpperCase();
+  dom.demoDecisionRequestId.textContent = entry.requestId || "--";
+  dom.demoDecisionLatency.textContent = formatDuration(entry.durationMs);
+  dom.demoDecisionOutcome.textContent = (entry.outcome || "--").toUpperCase();
+}
+
+function renderEvidenceCards(entries) {
+  if (!dom.metricE2EP95 || !dom.metricBlockRate || !dom.metricErrorRate) {
+    return;
+  }
+
+  const total = entries.length;
+  const durations = entries.map((entry) => entry.durationMs).filter((value) => Number.isFinite(value));
+  const blocked = entries.filter((entry) => entry.verdict === "Block").length;
+  const errors = entries.filter((entry) => entry.verdict === "Error").length;
+
+  dom.metricE2EP95.textContent = formatDuration(percentile(durations, 95));
+  dom.metricBlockRate.textContent = formatPercent(blocked, total);
+  dom.metricErrorRate.textContent = formatPercent(errors, total);
+}
+
+function renderIncidentTimeline(entries) {
+  if (!dom.incidentTimeline) return;
+  dom.incidentTimeline.innerHTML = "";
+
+  const recent = entries.slice(0, 6);
+  if (recent.length === 0) {
+    dom.incidentTimeline.innerHTML = '<li class="incident-empty">Run a scan to populate incident timeline.</li>';
+    if (dom.timelineSummary) {
+      dom.timelineSummary.textContent = "Recent 0 requests";
+    }
+    return;
+  }
+
+  recent.forEach((entry) => {
+    const item = document.createElement("li");
+    item.className = `incident-item incident-item--${entry.verdict.toLowerCase()}`;
+
+    const headline = document.createElement("div");
+    headline.className = "incident-headline";
+    headline.textContent = `${formatEventTime(entry.time)} · ${entry.mode.toUpperCase()} · ${entry.verdict}`;
+
+    const detail = document.createElement("div");
+    detail.className = "incident-detail";
+    const reason = truncateText(entry.reasons[0] || entry.scannerEvidence[0]?.reason || "No reason captured", 92);
+    detail.textContent = `${entry.outcome} · ${formatDuration(entry.durationMs)} · ${reason}`;
+
+    item.appendChild(headline);
+    item.appendChild(detail);
+    dom.incidentTimeline.appendChild(item);
+  });
+
+  if (dom.timelineSummary) {
+    dom.timelineSummary.textContent = `Recent ${recent.length} / ${entries.length} requests`;
+  }
+}
+
+function renderWhyBlocked(entry) {
+  if (
+    !dom.whyBlockedStatus ||
+    !dom.whyBlockedRequestId ||
+    !dom.whyBlockedMode ||
+    !dom.whyBlockedLatency ||
+    !dom.whyBlockedReason ||
+    !dom.whyBlockedScanners
+  ) {
+    return;
+  }
+
+  if (!entry) {
+    dom.whyBlockedStatus.textContent = "No blocked event yet";
+    dom.whyBlockedRequestId.textContent = "--";
+    dom.whyBlockedMode.textContent = "--";
+    dom.whyBlockedLatency.textContent = "--";
+    dom.whyBlockedReason.textContent = "No blocked evidence captured yet.";
+    if (dom.whyBlockedPolicy) dom.whyBlockedPolicy.textContent = "--";
+    if (dom.whyBlockedSnippet) dom.whyBlockedSnippet.textContent = "--";
+    dom.whyBlockedScanners.innerHTML = '<li class="incident-empty">No scanner evidence yet.</li>';
+    return;
+  }
+
+  const primaryScanner = entry.scannerEvidence[0] || null;
+  const snippet = entry.scannerEvidence.find((scanner) => scanner.reason)?.reason || entry.reasons[0] || "--";
+
+  dom.whyBlockedStatus.textContent = `${formatEventTime(entry.time)} blocked`;
+  dom.whyBlockedRequestId.textContent = entry.requestId || "--";
+  dom.whyBlockedMode.textContent = (entry.mode || "--").toUpperCase();
+  dom.whyBlockedLatency.textContent = formatDuration(entry.durationMs);
+  dom.whyBlockedReason.textContent = truncateText(entry.reasons[0] || "No primary reason available", 180);
+  if (dom.whyBlockedPolicy) dom.whyBlockedPolicy.textContent = primaryScanner ? primaryScanner.name : "--";
+  if (dom.whyBlockedSnippet) dom.whyBlockedSnippet.textContent = truncateText(snippet, 180);
+
+  dom.whyBlockedScanners.innerHTML = "";
+  if (!entry.scannerEvidence.length) {
+    dom.whyBlockedScanners.innerHTML = '<li class="incident-empty">No scanner evidence yet.</li>';
+    return;
+  }
+
+  entry.scannerEvidence.slice(0, 5).forEach((scanner) => {
+    const item = document.createElement("li");
+    item.textContent = `${scanner.name} · ${scanner.outcome}${scanner.reason ? ` · ${scanner.reason}` : ""}`;
+    dom.whyBlockedScanners.appendChild(item);
+  });
+}
+
+function renderEngineerDetails() {
+  if (dom.engineerRawJson) {
+    dom.engineerRawJson.textContent = state.analytics.lastRawJson;
+  }
+  if (!dom.engineerStageTrace) {
+    return;
+  }
+
+  dom.engineerStageTrace.innerHTML = "";
+  const traces = state.analytics.lastStageTrace;
+  if (!traces.length) {
+    dom.engineerStageTrace.innerHTML = '<li class="incident-empty">No stage trace yet.</li>';
+    return;
+  }
+
+  traces.slice(-10).forEach((trace) => {
+    const stageText = String(trace?.stage || "unknown");
+    const lower = stageText.toLowerCase();
+    const typeClass = lower.includes("block")
+      ? "incident-item--block"
+      : lower.includes("error")
+        ? "incident-item--error"
+        : "incident-item--allow";
+    const item = document.createElement("li");
+    item.className = `incident-item ${typeClass}`;
+
+    const headline = document.createElement("div");
+    headline.className = "incident-headline";
+    headline.textContent = `${formatEventTime(trace.time)} · ${stageText}`;
+
+    item.appendChild(headline);
+    dom.engineerStageTrace.appendChild(item);
+  });
+}
+
+function updateSecurityAnalytics() {
+  const entries = state.analytics.entries;
+  renderDecisionHero(state.analytics.lastEntry);
+  renderEvidenceCards(entries);
+  renderIncidentTimeline(entries);
+  renderWhyBlocked(state.analytics.lastBlocked);
+  renderEngineerDetails();
+}
+
+function recordAnalyticsEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    return;
+  }
+
+  state.analytics.lastEntry = entry;
+  state.analytics.entries.unshift(entry);
+  state.analytics.entries = state.analytics.entries.slice(0, ANALYTICS_HISTORY_LIMIT);
+  if (entry.verdict === "Block") {
+    state.analytics.lastBlocked = entry;
+  }
+  updateSecurityAnalytics();
+}
+
+const FLOW_ACTIVE_CLASSES = [
+  "flow-active",
+  "flow-active-request",
+  "flow-active-response",
+  "flow-active-scan",
+  "flow-active-block",
+  "flow-active-async",
+];
+
+const FLOW_DONE_CLASSES = [
+  "flow-done",
+  "flow-done-request",
+  "flow-done-response",
+  "flow-done-scan",
+  "flow-done-block",
+  "flow-done-async",
+];
+
+function clearFlowCurrent() {
+  dom.flowBoard.querySelectorAll(".flow-active, .flow-active-request, .flow-active-response, .flow-active-scan, .flow-active-block, .flow-active-async").forEach((el) => {
+    el.classList.remove(...FLOW_ACTIVE_CLASSES);
+  });
 }
 
 function clearFlowHighlights() {
-  dom.flowBoard.querySelectorAll(".flow-active, .flow-active-request, .flow-active-response, .flow-active-scan, .flow-active-block, .flow-active-async").forEach((el) => {
-    el.classList.remove("flow-active", "flow-active-request", "flow-active-response", "flow-active-scan", "flow-active-block", "flow-active-async");
+  dom.flowBoard.querySelectorAll(".flow-active, .flow-active-request, .flow-active-response, .flow-active-scan, .flow-active-block, .flow-active-async, .flow-done, .flow-done-request, .flow-done-response, .flow-done-scan, .flow-done-block, .flow-done-async").forEach((el) => {
+    el.classList.remove(...FLOW_ACTIVE_CLASSES, ...FLOW_DONE_CLASSES);
   });
+}
+
+function hasGuardrailDetection(payload, mappedResult = null) {
+  if (mappedResult?.verdict && mappedResult.verdict !== "Allow") {
+    return true;
+  }
+
+  const result = payload && typeof payload === "object" ? payload.result || {} : {};
+  const outcome = String(result.outcome || "").trim().toLowerCase();
+  const riskyOutcomes = new Set([
+    "blocked",
+    "block",
+    "failed",
+    "deny",
+    "denied",
+    "rejected",
+    "flagged",
+    "review",
+    "caution",
+    "needs_review",
+    "needs-review",
+  ]);
+  if (riskyOutcomes.has(outcome)) {
+    return true;
+  }
+
+  const scannerResults = Array.isArray(result.scannerResults) ? result.scannerResults : [];
+  for (const scanner of scannerResults) {
+    const scannerOutcome = String(scanner?.outcome || "").trim().toLowerCase();
+    if (
+      scannerOutcome === "failed" ||
+      scannerOutcome === "fail" ||
+      scannerOutcome === "blocked" ||
+      scannerOutcome === "block" ||
+      scannerOutcome === "flagged" ||
+      scannerOutcome === "review" ||
+      scannerOutcome === "caution"
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function applyOobGuardrailDetectionVisual(isDetected) {
+  const nodeConfigs = [
+    { id: "o-core", isCircle: false },
+    { id: "o-scanner", isCircle: false },
+    { id: "o-n4", isCircle: true },
+  ];
+
+  nodeConfigs.forEach(({ id, isCircle }) => {
+    const element = getFlowElement(id);
+    if (!element) return;
+
+    if (isDetected) {
+      element.classList.add("flow-done", "flow-done-block");
+      element.classList.remove("flow-done-async", "flow-done-request", "flow-done-response", "flow-done-scan");
+      element.style.setProperty("border-color", "#ff5a7a", "important");
+      element.style.setProperty(
+        "box-shadow",
+        "0 0 0 1px rgba(255, 90, 122, 0.45), inset 0 0 10px rgba(255, 90, 122, 0.16)",
+        "important",
+      );
+      if (isCircle) {
+        element.style.setProperty("background", "rgba(108, 35, 53, 0.92)", "important");
+      }
+    } else {
+      element.classList.remove("flow-done", "flow-done-block");
+      element.style.removeProperty("border-color");
+      element.style.removeProperty("box-shadow");
+      if (isCircle) {
+        element.style.removeProperty("background");
+      }
+    }
+  });
+}
+
+function getFlowElement(nodeId) {
+  return dom.flowBoard.querySelector(`[data-node="${nodeId}"]`);
+}
+
+function updateInlineFlowLabel(stepNumber, suffix = "", detail = "") {
+  const stepText = Number.isFinite(stepNumber) ? `Step ${stepNumber}/${INLINE_FLOW_STEP_TOTAL}` : "";
+  const parts = [modeDescriptions.inline, stepText, detail, suffix].filter(Boolean);
+  dom.flowModeLabel.textContent = parts.join(" · ");
+}
+
+function updateOobFlowLabel(stepNumber, suffix = "", detail = "") {
+  const stepText = Number.isFinite(stepNumber) ? `Step ${stepNumber}/${OOB_FLOW_STEP_TOTAL}` : "";
+  const parts = [modeDescriptions.oob, stepText, detail, suffix].filter(Boolean);
+  dom.flowModeLabel.textContent = parts.join(" · ");
+}
+
+function getInlineStageTimeline(stage) {
+  switch (stage) {
+    case "guardrail_start":
+      return [
+        {
+          nodes: ["i-chatbot"],
+          phase: "request",
+          durationMs: 240,
+          persist: false,
+          label: "Chatbot dispatches request",
+        },
+        {
+          stepNumber: 1,
+          circles: ["i-n1"],
+          phase: "request",
+          durationMs: 220,
+          label: "Step 1 • Chatbot -> NGINX",
+        },
+        {
+          nodes: ["i-nginx"],
+          phase: "request",
+          durationMs: 240,
+          persist: false,
+          label: "NGINX receives request",
+        },
+        {
+          stepNumber: 2,
+          circles: ["i-n2"],
+          phase: "request",
+          durationMs: 220,
+          label: "Step 2 • NGINX -> F5 AI Runtime",
+        },
+        {
+          nodes: ["i-core"],
+          phase: "scan",
+          durationMs: 240,
+          persist: false,
+          label: "F5 AI Runtime receives request",
+        },
+        {
+          nodes: ["i-scanner"],
+          phase: "scan",
+          durationMs: 240,
+          label: "F5/Custom Guardrails scanning",
+          hold: true,
+        },
+      ];
+    case "inline_dispatch":
+      return [];
+    case "inline_waiting":
+      return [];
+    case "guardrail_result":
+      return [
+        {
+          nodes: ["i-core", "i-scanner"],
+          phase: "scan",
+          durationMs: 260,
+          persist: false,
+          label: "Guardrail decision finalized",
+        },
+      ];
+    case "llm_start":
+      return [];
+    case "llm_response":
+      return [
+        {
+          stepNumber: 3,
+          circles: ["i-n3"],
+          phase: "request",
+          durationMs: 220,
+          label: "Step 3 • Guardrails -> LLM",
+        },
+        {
+          nodes: ["i-llm"],
+          phase: "request",
+          durationMs: 240,
+          persist: false,
+          label: "LLM receives request",
+        },
+        {
+          stepNumber: 4,
+          circles: ["i-n4"],
+          phase: "response",
+          durationMs: 220,
+          label: "Step 4 • LLM -> Guardrails",
+        },
+        {
+          nodes: ["i-core"],
+          phase: "response",
+          durationMs: 240,
+          persist: false,
+          label: "F5 AI Runtime receives response",
+        },
+        {
+          nodes: ["i-scanner"],
+          phase: "response",
+          durationMs: 240,
+          persist: false,
+          label: "F5/Custom Guardrails validates response",
+        },
+        {
+          stepNumber: 5,
+          circles: ["i-n5"],
+          phase: "response",
+          durationMs: 220,
+          label: "Step 5 • Guardrails -> NGINX",
+        },
+        {
+          nodes: ["i-nginx"],
+          phase: "response",
+          durationMs: 240,
+          label: "NGINX receives validated response",
+        },
+      ];
+    case "response_scan_start":
+    case "response_scan_result":
+      return [
+        {
+          nodes: ["i-core", "i-scanner"],
+          circles: [],
+          phase: "scan",
+          durationMs: 320,
+          persist: false,
+        },
+      ];
+    case "blocked":
+      return [
+        {
+          nodes: ["i-core"],
+          phase: "block",
+          durationMs: 240,
+          persist: false,
+          label: "F5 AI Runtime applies block policy",
+        },
+        {
+          nodes: ["i-scanner"],
+          phase: "block",
+          durationMs: 240,
+          persist: false,
+          label: "F5/Custom Guardrails returns block verdict",
+        },
+        {
+          stepNumber: 5,
+          circles: ["i-n5"],
+          phase: "block",
+          durationMs: 220,
+          label: "Step 5 • Guardrails -> NGINX (blocked)",
+        },
+        {
+          nodes: ["i-nginx"],
+          phase: "block",
+          durationMs: 240,
+          label: "NGINX receives blocked response",
+        },
+        {
+          stepNumber: 6,
+          circles: ["i-n6"],
+          phase: "block",
+          durationMs: 220,
+          label: "Step 6 • NGINX -> Chatbot (blocked)",
+        },
+        {
+          nodes: ["i-chatbot"],
+          phase: "block",
+          durationMs: 260,
+          label: "Chatbot receives blocked response",
+        },
+      ];
+    case "done":
+      if (state.flowBlocked) {
+        return [];
+      }
+      return [
+        {
+          stepNumber: 6,
+          circles: ["i-n6"],
+          phase: "response",
+          durationMs: 220,
+          label: "Step 6 • NGINX -> Chatbot",
+        },
+        {
+          nodes: ["i-chatbot"],
+          phase: "response",
+          durationMs: 260,
+          label: "Chatbot receives final response",
+        },
+      ];
+    default:
+      return [];
+  }
+}
+
+function getOobStageTimeline(stage) {
+  switch (stage) {
+    case "guardrail_start":
+      return [
+        {
+          stepNumber: 1,
+          nodes: ["o-chatbot"],
+          circles: ["o-n1"],
+          phase: "request",
+          durationMs: 380,
+          label: "Chatbot sends request to NGINX",
+        },
+        {
+          stepNumber: 2,
+          nodes: ["o-nginx", "o-core"],
+          circles: ["o-n3"],
+          phase: "async",
+          durationMs: 320,
+          label: "NGINX submits request to Guardrail",
+          hold: true,
+        },
+      ];
+    case "guardrail_result":
+      {
+        const detected = Boolean(state.oobGuardrailDetected);
+      return [
+        {
+          stepNumber: 3,
+          nodes: ["o-core", "o-scanner"],
+          circles: ["o-n4"],
+          phase: detected ? "block" : "async",
+          durationMs: 360,
+          label: detected ? "Guardrail flagged request" : "Guardrail returns scan decision",
+          persist: detected,
+        },
+      ];
+      }
+    case "llm_start":
+      return [
+        {
+          stepNumber: 4,
+          nodes: ["o-nginx", "o-llm"],
+          circles: ["o-n2"],
+          phase: "request",
+          durationMs: 320,
+          label: "NGINX forwards cleared request to LLM",
+          hold: true,
+        },
+      ];
+    case "llm_response":
+      return [
+        {
+          stepNumber: 5,
+          nodes: ["o-llm", "o-nginx"],
+          circles: ["o-n5"],
+          phase: "response",
+          durationMs: 380,
+          label: "LLM response returns to NGINX",
+        },
+      ];
+    case "blocked":
+      return [
+        {
+          stepNumber: 3,
+          nodes: ["o-core", "o-scanner"],
+          circles: ["o-n4"],
+          phase: "block",
+          durationMs: 340,
+          label: "Guardrail blocks request",
+        },
+        {
+          stepNumber: 6,
+          nodes: ["o-nginx", "o-chatbot"],
+          circles: ["o-n6"],
+          phase: "block",
+          durationMs: 380,
+          label: "NGINX returns blocked response to Chatbot",
+        },
+      ];
+    case "done":
+      if (state.flowBlocked) {
+        return [];
+      }
+      return [
+        {
+          stepNumber: 6,
+          nodes: ["o-nginx", "o-chatbot"],
+          circles: ["o-n6"],
+          phase: "response",
+          durationMs: 380,
+          label: "NGINX returns final response to Chatbot",
+        },
+      ];
+    default:
+      return [];
+  }
+}
+
+async function runFlowAction(action, mode, runId) {
+  if (runId !== state.flowRunId) {
+    return;
+  }
+
+  const ids = [...new Set([...(action.nodes || []), ...(action.circles || [])])];
+  const elements = ids.map((id) => getFlowElement(id)).filter(Boolean);
+  if (elements.length === 0) {
+    return;
+  }
+
+  clearFlowCurrent();
+
+  const phaseClass = `flow-active-${action.phase || "request"}`;
+  elements.forEach((el) => {
+    el.classList.add("flow-active", phaseClass);
+  });
+
+  if (Number.isFinite(action.stepNumber)) {
+    if (mode === "inline") {
+      updateInlineFlowLabel(action.stepNumber, "", action.label || "");
+    } else {
+      updateOobFlowLabel(action.stepNumber, "", action.label || "");
+    }
+  }
+
+  await wait(action.durationMs || 360);
+  if (runId !== state.flowRunId) {
+    return;
+  }
+
+  if (action.hold) {
+    return;
+  }
+
+  elements.forEach((el) => {
+    el.classList.remove("flow-active", phaseClass);
+  });
+
+  if (action.persist !== false) {
+    const donePhaseClass = `flow-done-${action.phase || "request"}`;
+    elements.forEach((el) => {
+      el.classList.add("flow-done", donePhaseClass);
+    });
+  }
 }
 
 function wait(ms) {
@@ -353,70 +1182,43 @@ function parseSSEChunk(buffer) {
   return events;
 }
 
-async function highlightStage(stage, mode) {
-  const prefix = mode === "inline" ? "i" : "o";
-  const p = (id) => `${prefix}-${id}`;
+async function highlightStage(stage, mode, runId = state.flowRunId) {
+  if (runId !== state.flowRunId) {
+    return;
+  }
 
-  const stageMap = {
-    guardrail_start: {
-      nodes: [p("chatbot"), p("nginx"), p("core")],
-      circles: [p("n1"), p("n2")],
-      phase: "request",
-    },
-    guardrail_result: {
-      nodes: [p("scanner")],
-      circles: [],
-      phase: "scan",
-    },
-    blocked: {
-      nodes: [p("core"), p("nginx"), p("chatbot")],
-      circles: mode === "inline" ? [p("n5"), p("n6")] : [p("n4"), p("n5")],
-      phase: "block",
-    },
-    llm_start: {
-      nodes: [p("core"), p("llm")],
-      circles: [p("n3")],
-      phase: "request",
-    },
-    llm_response: {
-      nodes: [p("llm")],
-      circles: [],
-      phase: "response",
-    },
-    response_scan_start: {
-      nodes: [p("core"), p("scanner")],
-      circles: [],
-      phase: "scan",
-    },
-    response_scan_result: {
-      nodes: [p("scanner")],
-      circles: [],
-      phase: "scan",
-    },
-    done: {
-      nodes: [p("llm"), p("nginx"), p("chatbot")],
-      circles: mode === "inline" ? [p("n4"), p("n5"), p("n6")] : [p("n4"), p("n5")],
-      phase: "response",
-    },
-  };
+  if (stage === "blocked") {
+    state.flowBlocked = true;
+  }
 
-  const mapping = stageMap[stage];
-  if (!mapping) return;
+  const actions = mode === "inline" ? getInlineStageTimeline(stage) : getOobStageTimeline(stage);
+  if (!actions.length) {
+    return;
+  }
 
-  clearFlowHighlights();
-  const phaseClass = `flow-active-${mapping.phase}`;
+  for (const action of actions) {
+    await runFlowAction(action, mode, runId);
+    if (runId !== state.flowRunId) {
+      return;
+    }
+  }
 
-  mapping.nodes.forEach((id) => {
-    const el = dom.flowBoard.querySelector(`[data-node="${id}"]`);
-    if (el) el.classList.add("flow-active", phaseClass);
-  });
+  if (stage === "blocked") {
+    if (mode === "inline") {
+      updateInlineFlowLabel(6, "Blocked", "Flow terminated by guardrail");
+    } else {
+      updateOobFlowLabel(6, "Blocked", "Flow terminated by guardrail");
+    }
+    return;
+  }
 
-  mapping.circles.forEach((id) => {
-    const el = dom.flowBoard.querySelector(`[data-node="${id}"]`);
-    if (el) el.classList.add("flow-active", phaseClass);
-  });
-
-  await wait(600);
+  if (stage === "done" && !state.flowBlocked) {
+    if (mode === "inline") {
+      updateInlineFlowLabel(6, "Completed", "End-to-end flow delivered");
+    } else {
+      updateOobFlowLabel(6, "Completed", "End-to-end flow delivered");
+    }
+  }
 }
 
 function renderLLMResponse(content, model, isBlocked) {
@@ -584,8 +1386,8 @@ async function handleScan() {
     dom.apiToken.focus();
     return;
   }
-  if (!openrouterKey) {
-    dom.scanState.textContent = "Please fill OpenRouter Key first.";
+  if (state.mode === "oob" && !openrouterKey) {
+    dom.scanState.textContent = "Please fill OpenRouter Key first (required for OOB mode).";
     dom.openrouterKey.focus();
     return;
   }
@@ -597,18 +1399,56 @@ async function handleScan() {
 
   setScanning(true);
   dom.flowBoard.classList.add("is-running");
+  state.flowRunId += 1;
+  const flowRunId = state.flowRunId;
+  state.flowBlocked = false;
+  state.oobGuardrailDetected = false;
+  dom.flowModeLabel.textContent = modeDescriptions[state.mode];
   clearFlowHighlights();
+  applyOobGuardrailDetectionVisual(false);
 
   let guardrailPayload = null;
   let llmContent = "";
   let llmModel = model;
   let wasBlocked = false;
+  const requestStartPerf = performance.now();
+  let analyticsEntry = null;
+  const stageTrace = [];
+  let totalTimeoutId = null;
+  let idleTimeoutId = null;
+  let lastSseStage = "request_sent";
+  let abortReason = `Request timeout after ${Math.round(SSE_TOTAL_TIMEOUT_MS / 1000)}s.`;
+  const skippedInlinePreludeStages = new Set();
+  let animationChain = Promise.resolve();
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90000);
+    const abortWithReason = (reason) => {
+      if (controller.signal.aborted) {
+        return;
+      }
+      abortReason = reason;
+      controller.abort();
+    };
 
-    const response = await fetch(endpoint, {
+    const resetIdleWatchdog = () => {
+      if (idleTimeoutId) {
+        clearTimeout(idleTimeoutId);
+      }
+      idleTimeoutId = setTimeout(() => {
+        abortWithReason(
+          `SSE idle timeout after ${Math.round(SSE_IDLE_TIMEOUT_MS / 1000)}s (last stage: ${lastSseStage}).`,
+        );
+      }, SSE_IDLE_TIMEOUT_MS);
+    };
+
+    totalTimeoutId = setTimeout(() => {
+      abortWithReason(`Request timeout after ${Math.round(SSE_TOTAL_TIMEOUT_MS / 1000)}s.`);
+    }, SSE_TOTAL_TIMEOUT_MS);
+    resetIdleWatchdog();
+    dom.scanState.textContent = "Dispatching request to pipeline...";
+
+    const responsePromise = fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -621,7 +1461,16 @@ async function handleScan() {
       signal: controller.signal,
     });
 
-    clearTimeout(timeout);
+    if (state.mode === "inline") {
+      skippedInlinePreludeStages.add("guardrail_start");
+      skippedInlinePreludeStages.add("inline_dispatch");
+      skippedInlinePreludeStages.add("inline_waiting");
+      dom.scanState.textContent = "Request sent to NGINX • routing to guardrails...";
+      animationChain = highlightStage("guardrail_start", state.mode, flowRunId);
+      dom.scanState.textContent = "Stage: inline_waiting";
+    }
+
+    const response = await responsePromise;
 
     if (!response.ok) {
       throw new Error(`SSE request failed (${response.status})`);
@@ -635,6 +1484,8 @@ async function handleScan() {
       const { done, value } = await reader.read();
       if (done) break;
 
+      resetIdleWatchdog();
+
       buffer += decoder.decode(value, { stream: true });
 
       // Split on double newlines to find complete SSE events
@@ -647,28 +1498,50 @@ async function handleScan() {
       const events = parseSSEChunk(completePart);
 
       for (const event of events) {
-        dom.scanState.textContent = `Stage: ${event.stage}`;
-        await highlightStage(event.stage, state.mode);
+        const stageName = String(event?.stage || "unknown");
+        lastSseStage = stageName;
+        resetIdleWatchdog();
+        stageTrace.push({
+          stage: lastSseStage,
+          time: Number.isFinite(event?.ts) ? Number(event.ts) : Date.now(),
+        });
+        if (stageTrace.length > 30) {
+          stageTrace.shift();
+        }
 
-        if (event.stage === "guardrail_result") {
+        if (state.mode === "inline" && skippedInlinePreludeStages.has(stageName)) {
+          skippedInlinePreludeStages.delete(stageName);
+          continue;
+        }
+
+        if (stageName === "guardrail_result" && state.mode === "oob") {
+          const preview = mapScanApiResult(event.guardrail || {});
+          state.oobGuardrailDetected = hasGuardrailDetection(event.guardrail || {}, preview);
+        }
+
+        dom.scanState.textContent = `Stage: ${stageName}`;
+        animationChain = animationChain.then(() => highlightStage(stageName, state.mode, flowRunId));
+
+        if (stageName === "guardrail_result") {
           guardrailPayload = event.guardrail;
         }
 
-        if (event.stage === "response_scan_result") {
+        if (stageName === "response_scan_result") {
           // Post-scan result (inline only) — use this as the final guardrail payload
           guardrailPayload = event.guardrail;
         }
 
-        if (event.stage === "blocked") {
+        if (stageName === "blocked") {
           wasBlocked = true;
+          state.flowBlocked = true;
         }
 
-        if (event.stage === "llm_response") {
+        if (stageName === "llm_response") {
           llmContent = event.llm?.content || "";
           llmModel = event.llm?.model || model;
         }
 
-        if (event.stage === "error") {
+        if (stageName === "error") {
           throw new Error(event.message || "Unknown SSE error");
         }
       }
@@ -676,34 +1549,74 @@ async function handleScan() {
 
     // Render final results
     if (guardrailPayload) {
-      const mapped = mapScanApiResult(guardrailPayload);
+      const mapped = state.mode === "inline"
+        ? mapPromptApiResult(guardrailPayload)
+        : mapScanApiResult(guardrailPayload);
       if (wasBlocked) {
         mapped.verdict = "Block";
         mapped.level = "high";
       }
       renderResult(mapped);
+      if (state.mode === "oob") {
+        const detected = mapped.verdict !== "Allow" || wasBlocked || hasGuardrailDetection(guardrailPayload, mapped);
+        state.oobGuardrailDetected = detected;
+        applyOobGuardrailDetectionVisual(detected);
+      }
       renderRawJson(guardrailPayload);
-      updateAnalytics(mapped);
       dom.scanState.textContent = `Scan complete • ${mapped.meta.outcome}`;
+      analyticsEntry = createAnalyticsEntryFromResult(
+        mapped,
+        state.mode,
+        performance.now() - requestStartPerf,
+        Date.now(),
+      );
     } else {
       dom.scanState.textContent = "Scan complete • no guardrail data";
+      analyticsEntry = createAnalyticsEntryFromError(
+        "No guardrail data returned by SSE pipeline.",
+        state.mode,
+        performance.now() - requestStartPerf,
+        Date.now(),
+      );
     }
 
     renderLLMResponse(llmContent, llmModel, wasBlocked);
 
   } catch (error) {
-    if (error.name === "AbortError") {
-      error.message = "Request timeout after 90s.";
+    const errorMessage = error.name === "AbortError"
+      ? abortReason
+      : (error && error.message ? String(error.message) : "Unknown scan error.");
+    state.flowBlocked = true;
+    animationChain = animationChain.then(() => highlightStage("blocked", state.mode, flowRunId));
+    if (!stageTrace.length || stageTrace[stageTrace.length - 1]?.stage !== "error") {
+      stageTrace.push({ stage: `error: ${errorMessage}`, time: Date.now() });
     }
-    await highlightStage("blocked", state.mode);
-    renderApiError(error.message);
-    renderRawJson({ error: error.message });
+    renderApiError(errorMessage);
+    renderRawJson({ error: errorMessage });
     renderLLMResponse("", "", true);
-    dom.scanState.textContent = `Scan failed: ${error.message}`;
+    dom.scanState.textContent = `Scan failed: ${errorMessage}`;
+    analyticsEntry = createAnalyticsEntryFromError(
+      errorMessage,
+      state.mode,
+      performance.now() - requestStartPerf,
+      Date.now(),
+    );
   } finally {
-    clearFlowHighlights();
-    dom.flowBoard.classList.remove("is-running");
+    if (totalTimeoutId) {
+      clearTimeout(totalTimeoutId);
+    }
+    if (idleTimeoutId) {
+      clearTimeout(idleTimeoutId);
+    }
+    state.analytics.lastStageTrace = stageTrace.slice(-16);
+    recordAnalyticsEntry(analyticsEntry);
     setScanning(false);
+    // Let flow diagram animations finish before cleaning up visual state
+    const flowCleanup = () => {
+      clearFlowCurrent();
+      dom.flowBoard.classList.remove("is-running");
+    };
+    animationChain.then(flowCleanup, flowCleanup);
   }
 }
 
@@ -734,6 +1647,9 @@ function initListeners() {
   });
 
   dom.scanBtn.addEventListener("click", handleScan);
+  if (dom.copyRawJsonBtn) {
+    dom.copyRawJsonBtn.addEventListener("click", handleCopyRawJson);
+  }
   dom.saveSettingsBtn.addEventListener("click", handleSaveSettings);
   dom.resultTabSummary.addEventListener("click", () => setResultTab("summary"));
   dom.resultTabJson.addEventListener("click", () => setResultTab("json"));
@@ -776,8 +1692,7 @@ function init() {
     },
   });
   renderRawJson({ message: "Run a real scan to view raw JSON response." });
-  dom.kpiReviewCount.textContent = "0";
-  dom.kpiReviewTrend.textContent = "0.0% review rate";
+  updateSecurityAnalytics();
   setResultTab("summary");
   setConnectionState("Not Connected", "--text-muted");
   if (hasCredentials()) {

@@ -1,13 +1,23 @@
 js_import orchestrator from /etc/nginx/njs/orchestrator.js;
 js_var $guardrails_upstream ${GUARDRAILS_UPSTREAM};
+js_var $calypso_auth '';
 js_fetch_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+
+subrequest_output_buffer_size 64k;
+
+# Upstream pool with keepalive — TCP+TLS connections are reused across requests
+upstream calypso_api {
+    server ${CALYPSO_HOST}:${CALYPSO_PORT};
+    keepalive 16;
+    keepalive_timeout 60s;
+}
 
 server {
     listen ${NGINX_LISTEN_PORT};
     server_name _;
 
-    resolver 127.0.0.11 8.8.8.8 ipv6=off valid=30s;
-    resolver_timeout 5s;
+    resolver 8.8.8.8 1.1.1.1 ipv6=off valid=60s;
+    resolver_timeout 3s;
 
     root /usr/share/nginx/html;
     index index.html;
@@ -44,6 +54,10 @@ server {
         client_body_in_single_buffer on;
         client_body_buffer_size 64k;
         client_max_body_size 64k;
+        postpone_output 0;
+        chunked_transfer_encoding on;
+        gzip off;
+        add_header X-Accel-Buffering "no" always;
         js_content orchestrator.inlineChat;
         proxy_buffering off;
         sendfile off;
@@ -55,10 +69,55 @@ server {
         client_body_in_single_buffer on;
         client_body_buffer_size 64k;
         client_max_body_size 64k;
+        postpone_output 0;
+        chunked_transfer_encoding on;
+        gzip off;
+        add_header X-Accel-Buffering "no" always;
         js_content orchestrator.oobChat;
         proxy_buffering off;
         sendfile off;
         tcp_nopush off;
         tcp_nodelay on;
     }
+
+    # Internal proxy locations for Calypso API (used via r.subrequest from njs)
+    # Static proxy_pass = DNS resolved once at startup
+    # upstream calypso_api = keepalive TCP+TLS connection reuse
+    location = /_internal/calypso_prompts {
+        internal;
+        proxy_pass ${CALYPSO_SCHEME}://calypso_api/backend/v1/prompts;
+        proxy_http_version 1.1;
+        proxy_ssl_server_name on;
+        proxy_ssl_name ${CALYPSO_HOST};
+        proxy_ssl_session_reuse on;
+        proxy_set_header Host ${CALYPSO_HOST};
+        proxy_set_header Authorization $calypso_auth;
+        proxy_set_header Content-Type "application/json";
+        proxy_set_header Connection "";
+        proxy_buffer_size 32k;
+        proxy_buffers 4 32k;
+        proxy_busy_buffers_size 64k;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 10s;
+    }
+
+    location = /_internal/calypso_scans {
+        internal;
+        proxy_pass ${CALYPSO_SCHEME}://calypso_api/backend/v1/scans;
+        proxy_http_version 1.1;
+        proxy_ssl_server_name on;
+        proxy_ssl_name ${CALYPSO_HOST};
+        proxy_ssl_session_reuse on;
+        proxy_set_header Host ${CALYPSO_HOST};
+        proxy_set_header Authorization $calypso_auth;
+        proxy_set_header Content-Type "application/json";
+        proxy_set_header Connection "";
+        proxy_buffer_size 32k;
+        proxy_buffers 4 32k;
+        proxy_busy_buffers_size 64k;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 10s;
+    }
+
+
 }

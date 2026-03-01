@@ -10,6 +10,9 @@ RUN rm -rf /usr/share/nginx/html/*
 # Copy njs orchestrator
 COPY nginx/orchestrator.js /etc/nginx/njs/orchestrator.js
 
+# Copy entrypoint script to extract upstream host/port before envsubst
+COPY nginx/14-extract-calypso-host.envsh /docker-entrypoint.d/14-extract-calypso-host.envsh
+
 # Copy frontend static files
 COPY index.html    /usr/share/nginx/html/
 COPY styles.css    /usr/share/nginx/html/

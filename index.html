@@ -3,24 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>F5 Al Guardrail Demo</title>
+    <title>F5 AI Guardrail Demo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260301-flow10" />
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to main content</a>
     <div class="bg-grid" aria-hidden="true"></div>
 
     <div class="app-shell">
       <header class="panel header-panel">
         <div>
-          <p class="eyebrow">F5 SECURITY OPS</p>
-          <h1>F5 Al Guardrail Demo</h1>
+          <p class="eyebrow">F5 AI Runtime Security</p>
+          <h1>F5 AI Guardrail Demo</h1>
         </div>
       </header>
 
@@ -53,25 +52,6 @@
                 autocomplete="off"
               />
             </label>
-            <label class="field field--grow">
-              <span>OpenRouter Key</span>
-              <input
-                id="openrouterKey"
-                type="password"
-                value=""
-                placeholder="sk-or-v1-..."
-                autocomplete="off"
-              />
-            </label>
-            <label class="field field--grow">
-              <span>Model</span>
-              <select id="llmModel">
-                <option value="openai/gpt-4o-mini" selected>openai/gpt-4o-mini</option>
-                <option value="openai/gpt-4o">openai/gpt-4o</option>
-                <option value="anthropic/claude-sonnet-4">anthropic/claude-sonnet-4</option>
-                <option value="google/gemini-2.0-flash">google/gemini-2.0-flash</option>
-              </select>
-            </label>
             <div class="field field--connection">
               <span>Connection</span>
               <div class="connection-pill">
@@ -88,39 +68,26 @@
               Save
             </button>
           </div>
-        </section>
 
-        <!-- Analytics -->
-        <section class="panel analytics-panel">
-          <div class="section-head">
-            <h2>Analytics</h2>
-            <p>Live guardrail telemetry</p>
-          </div>
-
-          <div class="kpi-grid">
-            <article class="kpi-card">
-              <h3>Requests Scanned</h3>
-              <p class="kpi-value" id="kpiRequests">0</p>
-              <p class="kpi-trend is-up" id="kpiRequestsTrend">Session</p>
-            </article>
-
-            <article class="kpi-card">
-              <h3>Blocked Prompts</h3>
-              <p class="kpi-value" id="kpiBlocked">0</p>
-              <p class="kpi-trend is-warn" id="kpiBlockedTrend">0.0% block rate</p>
-            </article>
-
-            <article class="kpi-card">
-              <h3>Reviews Raised</h3>
-              <p class="kpi-value" id="kpiReviewCount">0</p>
-              <p class="kpi-trend is-down" id="kpiReviewTrend">0.0% review rate</p>
-            </article>
-
-            <article class="kpi-card">
-              <h3>Policy Pass Rate</h3>
-              <p class="kpi-value" id="kpiPassRate">0.0%</p>
-              <p class="kpi-trend is-down" id="kpiPassTrend">Stable</p>
-            </article>
+          <div class="settings-row">
+            <label class="field field--grow">
+              <span>OpenRouter API Key (LLM Inference)</span>
+              <input
+                id="openrouterKey"
+                type="password"
+                value=""
+                placeholder="sk-or-v1-..."
+                autocomplete="off"
+              />
+            </label>
+            <label class="field field--grow">
+              <span>Model</span>
+              <select id="llmModel">
+                <option value="openai/gpt-4o">openai/gpt-4o</option>
+                <option value="anthropic/claude-sonnet-4">anthropic/claude-sonnet-4</option>
+                <option value="openai/gpt-oss-20b">openai/gpt-oss-120b</option>
+              </select>
+            </label>
           </div>
         </section>
 
@@ -172,7 +139,7 @@
               <p class="diagram-tag">ARCHITECTURE FLOW · INLINE</p>
 
               <div class="flow-lane flow-lane--request">
-                <div class="flow-node flow-node--chatbot" data-node="i-chatbot">CHATBOT</div>
+                <div class="flow-node flow-node--chatbot" data-node="i-chatbot">Chatbot</div>
 
                 <div class="flow-conn">
                   <div class="flow-step">
@@ -199,8 +166,8 @@
                 </div>
 
                 <div class="flow-core" data-node="i-core">
-                  <p>F5 AI GUARDRAILS</p>
-                  <div class="flow-node flow-node--scanner" data-node="i-scanner">SCANER</div>
+                  <p>F5 AI Runtime Security (SaaS)</p>
+                  <div class="flow-node flow-node--scanner" data-node="i-scanner">F5/Custom Guardrails</div>
                 </div>
 
                 <div class="flow-conn">
@@ -225,11 +192,11 @@
               <div class="flow-legend">
                 <span class="legend-pill legend-pill--request">
                   <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                  REQUEST PATH
+                  REQUEST
                 </span>
                 <span class="legend-pill legend-pill--response">
                   <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                  RESPONSE PATH
+                  RESPONSE
                 </span>
               </div>
             </div>
@@ -238,8 +205,24 @@
             <div class="flow-diagram flow-diagram--oob" data-diagram="oob" aria-label="Out-of-band architecture">
               <p class="diagram-tag">ARCHITECTURE FLOW · OUT-OF-BAND</p>
 
+              <div class="oob-scan-row">
+                <div class="oob-scan-core" data-node="o-core">
+                  <p>F5 AI Runtime Security (SaaS)</p>
+                  <div class="oob-scan-engine" data-node="o-scanner">F5/Custom Guardrails</div>
+                </div>
+              </div>
+
+              <div class="flow-bridge">
+                <span class="flow-bridge-label">guardrail request</span>
+                <svg class="flow-arrow flow-arrow--async" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+                <div class="step-circle step-circle--async" data-node="o-n3">2</div>
+                <div class="step-circle step-circle--async" data-node="o-n4">3</div>
+                <svg class="flow-arrow flow-arrow--async" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12 19V5M19 12l-7 7-7-7"/></svg>
+                <span class="flow-bridge-label">scan result</span>
+              </div>
+
               <div class="flow-lane flow-lane--request">
-                <div class="flow-node flow-node--chatbot" data-node="o-chatbot">CHATBOT</div>
+                <div class="flow-node flow-node--chatbot" data-node="o-chatbot">Chatbot</div>
 
                 <div class="flow-conn">
                   <div class="flow-step">
@@ -247,7 +230,7 @@
                     <svg class="flow-arrow flow-arrow--request" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                   </div>
                   <div class="flow-step">
-                    <div class="step-circle step-circle--response" data-node="o-n5">5</div>
+                    <div class="step-circle step-circle--response" data-node="o-n6">6</div>
                     <svg class="flow-arrow flow-arrow--response" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                   </div>
                 </div>
@@ -256,24 +239,12 @@
 
                 <div class="flow-conn">
                   <div class="flow-step">
-                    <div class="step-circle step-circle--request" data-node="o-n2">2</div>
+                    <div class="step-circle step-circle--request" data-node="o-n2">4</div>
                     <svg class="flow-arrow flow-arrow--request" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                   </div>
                   <div class="flow-step">
-                    <div class="step-circle step-circle--response" data-node="o-n4">4</div>
+                    <div class="step-circle step-circle--response" data-node="o-n5">5</div>
                     <svg class="flow-arrow flow-arrow--response" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                  </div>
-                </div>
-
-                <div class="flow-core" data-node="o-core">
-                  <p>F5 AI GUARDRAILS</p>
-                  <div class="flow-node flow-node--scanner" data-node="o-scanner">SCANNER</div>
-                </div>
-
-                <div class="flow-conn">
-                  <div class="flow-step">
-                    <div class="step-circle step-circle--request" data-node="o-n3">3</div>
-                    <svg class="flow-arrow flow-arrow--request" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                   </div>
                 </div>
 
@@ -281,18 +252,22 @@
               </div>
 
               <div class="flow-notes">
-                <span class="flow-note flow-note--warn">Blocked → return safe response, LLM not called</span>
-                <span class="flow-note flow-note--ok">Pass → forward to LLM inference</span>
+                <span class="flow-note flow-note--warn">Blocked -> backend returns generated safe response</span>
+                <span class="flow-note flow-note--ok">Cleared -> backend triggers LLM request</span>
               </div>
 
               <div class="flow-legend">
                 <span class="legend-pill legend-pill--request">
                   <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                  REQUEST PATH
+                  REQUEST
                 </span>
                 <span class="legend-pill legend-pill--response">
                   <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                  RESPONSE PATH
+                  RESPONSE
+                </span>
+                <span class="legend-pill legend-pill--async">
+                  <svg viewBox="0 0 24 24"><path d="M6 3v12M18 9a3 3 0 0 1 0 6H9"/></svg>
+                  ASYNC OOB
                 </span>
               </div>
             </div>
@@ -305,7 +280,7 @@
             <!-- Prompt Tester -->
             <div class="panel prompt-panel">
               <div class="section-head" style="margin-bottom: 14px;">
-                <h2>Prompt Tester</h2>
+                <h2>Prompt Tester (Chatbot)</h2>
               </div>
 
               <label class="field">
@@ -324,7 +299,7 @@
                     <path d="M11 8v6"></path>
                     <path d="M8 11h6"></path>
                   </svg>
-                  <span class="scan-label">Run Guardrail Scan</span>
+                  <span class="scan-label">Send</span>
                   <span class="scan-spinner" aria-hidden="true"></span>
                 </button>
                 <span id="scanState" class="scan-state">Idle</span>
@@ -427,7 +402,12 @@ Medium Risk</span>
 
             <section id="resultPanelJson" class="result-panel-content" role="tabpanel" hidden>
               <div class="raw-json-box">
-                <span>Raw JSON</span>
+                <div class="raw-json-head">
+                  <span>Raw JSON</span>
+                  <button id="copyRawJsonBtn" class="copy-json-btn" type="button" aria-label="Copy raw JSON">
+                    Copy JSON
+                  </button>
+                </div>
                 <pre id="rawJsonOutput" class="raw-json">{
   "message": "Run a real scan to view raw JSON response."
 }</pre>
@@ -457,6 +437,6 @@ Medium Risk</span>
       </main>
     </div>
 
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./app.js?v=20260301-flow10"></script>
   </body>
 </html>

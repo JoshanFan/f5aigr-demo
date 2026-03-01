@@ -1,5 +1,5 @@
 js_import orchestrator from /etc/nginx/njs/orchestrator.js;
-js_var $guardrails_upstream ${GUARDRAILS_UPSTREAM};
+js_var $guardrails_upstream "https://us1.calypsoai.app";
 js_var $calypso_auth '';
 js_fetch_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
 
@@ -7,13 +7,13 @@ subrequest_output_buffer_size 64k;
 
 # Upstream pool with keepalive — TCP+TLS connections are reused across requests
 upstream calypso_api {
-    server ${CALYPSO_HOST}:${CALYPSO_PORT};
+    server us1.calypsoai.app:443;
     keepalive 16;
     keepalive_timeout 60s;
 }
 
 server {
-    listen ${NGINX_LISTEN_PORT};
+    listen 3000;
     server_name _;
 
     resolver 8.8.8.8 1.1.1.1 ipv6=off valid=60s;
@@ -37,11 +37,11 @@ server {
     }
 
     location /backend/ {
-        proxy_pass ${GUARDRAILS_UPSTREAM};
+        proxy_pass https://us1.calypsoai.app;
         proxy_http_version 1.1;
         proxy_ssl_server_name on;
-        proxy_ssl_name $proxy_host;
-        proxy_set_header Host $proxy_host;
+        proxy_ssl_name us1.calypsoai.app;
+        proxy_set_header Host us1.calypsoai.app;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -85,12 +85,12 @@ server {
     # upstream calypso_api = keepalive TCP+TLS connection reuse
     location = /_internal/calypso_prompts {
         internal;
-        proxy_pass ${CALYPSO_SCHEME}://calypso_api/backend/v1/prompts;
+        proxy_pass https://calypso_api/backend/v1/prompts;
         proxy_http_version 1.1;
         proxy_ssl_server_name on;
-        proxy_ssl_name ${CALYPSO_HOST};
+        proxy_ssl_name us1.calypsoai.app;
         proxy_ssl_session_reuse on;
-        proxy_set_header Host ${CALYPSO_HOST};
+        proxy_set_header Host us1.calypsoai.app;
         proxy_set_header Authorization $calypso_auth;
         proxy_set_header Content-Type "application/json";
         proxy_set_header Connection "";
@@ -103,12 +103,12 @@ server {
 
     location = /_internal/calypso_scans {
         internal;
-        proxy_pass ${CALYPSO_SCHEME}://calypso_api/backend/v1/scans;
+        proxy_pass https://calypso_api/backend/v1/scans;
         proxy_http_version 1.1;
         proxy_ssl_server_name on;
-        proxy_ssl_name ${CALYPSO_HOST};
+        proxy_ssl_name us1.calypsoai.app;
         proxy_ssl_session_reuse on;
-        proxy_set_header Host ${CALYPSO_HOST};
+        proxy_set_header Host us1.calypsoai.app;
         proxy_set_header Authorization $calypso_auth;
         proxy_set_header Content-Type "application/json";
         proxy_set_header Connection "";

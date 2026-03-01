@@ -30,31 +30,17 @@ The app runs behind NGINX and uses an njs orchestrator to stream stage events to
 
 ## Quick Start
 
-1. Create env file:
-
-```bash
-cp .env.example .env
-```
-
-2. Edit `.env` and set your upstream:
-
-```env
-HOST_PORT=3000
-NGINX_LISTEN_PORT=3000
-GUARDRAILS_UPSTREAM=https://<your-guardrails-domain>
-```
-
-3. Build and run:
+1. Build and run:
 
 ```bash
 docker compose up -d --build
 ```
 
-4. Open UI:
+2. Open UI:
 
 - `http://localhost:3000`
 
-5. Verify service health:
+3. Verify service health:
 
 ```bash
 curl -i http://localhost:3000/healthz
@@ -98,8 +84,31 @@ Rebuild container after changes:
 docker compose up -d --build --force-recreate
 ```
 
+## GitHub Actions Deployment
+
+Workflow file: `.github/workflows/deploy.yml`
+
+Pipeline:
+
+1. Run syntax checks + unit tests
+2. Build and push image to Harbor:
+   - `harbor21.int.xxlab.run/f5aigr-demo/f5aigr-demo:sha-<commit>`
+   - `harbor21.int.xxlab.run/f5aigr-demo/f5aigr-demo:latest`
+3. SSH deploy to `172.21.70.72` and restart container on port `3000`
+
+Required GitHub repository secrets:
+
+- `HARBOR_USERNAME`
+- `HARBOR_PASSWORD`
+- `SSH_KEY`
+
+Trigger:
+
+- Push to `main`
+- Manual run via `workflow_dispatch`
+
 ## Notes
 
 - Keep credentials out of source control.
-- `.env` is local-only and not committed.
+- Guardrails upstream is hardcoded in `nginx/default.conf.template` as `https://us1.calypsoai.app`.
 - `README-NGINX.md` contains a minimal NGINX-focused runbook.

@@ -1,28 +1,22 @@
 # F5 AI Guardrails Demo - NGINX Proxy
 
-## 1) Prepare env
+## 1) Start
 
 ```bash
-cp .env.example .env
+docker compose up -d --build
 ```
 
-Edit `.env` and set:
-
-```env
-GUARDRAILS_UPSTREAM=https://<your-guardrails-upstream>
-```
-
-## 2) Start
-
-```bash
-docker compose up -d
-```
-
-## 3) Verify
+## 2) Verify
 
 ```bash
 curl -i http://127.0.0.1:3000/healthz
 curl -i http://127.0.0.1:3000/
+```
+
+Guardrails upstream is hardcoded in `nginx/default.conf.template`:
+
+```txt
+https://us1.calypsoai.app
 ```
 
 Proxy route:
@@ -30,7 +24,7 @@ Proxy route:
 - Frontend: `http://127.0.0.1:3000/`
 - Guardrails API via proxy: `http://127.0.0.1:3000/backend/...`
 
-## 4) Stop
+## 3) Stop
 
 ```bash
 docker compose down

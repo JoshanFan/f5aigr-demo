@@ -19,7 +19,7 @@ env:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
 
   build_push:
     name: Build and Push Image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     needs: test
     permissions:
       contents: read
@@ -74,7 +74,7 @@ jobs:
 
   deploy:
     name: Deploy to 172.21.70.72
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     needs: build_push
     if: ${{ always() && needs.build_push.result == 'success' }}
     steps:

@@ -107,6 +107,12 @@ Trigger:
 - Push to `main`
 - Manual run via `workflow_dispatch`
 
+Runner requirement:
+
+- GitHub self-hosted runner with network access to:
+  - `harbor21.int.xxlab.run`
+  - deployment host `172.21.70.72`
+
 ## Notes
 
 - Keep credentials out of source control.

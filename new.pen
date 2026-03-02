@@ -4006,6 +4006,366 @@
       "height": 1,
       "fill": "#FFFFFF",
       "layout": "none"
+    },
+    {
+      "type": "frame",
+      "id": "dIA9V",
+      "x": 3170,
+      "y": 80,
+      "name": "F5 AI Guardrail Demo - Login",
+      "width": 1440,
+      "height": 980,
+      "fill": "#070b14",
+      "cornerRadius": 20,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "#1f2c44"
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "21nGP",
+          "x": 24,
+          "y": 334,
+          "name": "Login Row",
+          "width": 1392,
+          "justifyContent": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "KcqjT",
+              "name": "Login Panel",
+              "width": 720,
+              "fill": "#0d1527",
+              "cornerRadius": 14,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#24395d"
+              },
+              "layout": "vertical",
+              "gap": 14,
+              "padding": 20,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "uvdRM",
+                  "name": "loginTitle",
+                  "fill": "#f2f7ff",
+                  "content": "F5 AI Runtime Security DEMO",
+                  "fontFamily": "Inter",
+                  "fontSize": 32,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "jsLHW",
+                  "name": "loginHint",
+                  "fill": "#8ea6cb",
+                  "content": "Sign in to continue to the demo console.",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "5USPX",
+                  "name": "usernameField",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "AG1Ck",
+                      "name": "usernameLabel",
+                      "fill": "#a8b8d6",
+                      "content": "Username",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "mFo8q",
+                      "name": "usernameInput",
+                      "width": "fill_container",
+                      "fill": "#0a1222",
+                      "cornerRadius": 8,
+                      "stroke": {
+                        "align": "inside",
+                        "thickness": 1,
+                        "fill": "#2a3f64"
+                      },
+                      "padding": [
+                        11,
+                        12
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "fegWA",
+                          "name": "usernamePlaceholder",
+                          "fill": "#d8e8ff",
+                          "content": "Enter username",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "2emLk",
+                  "name": "passwordField",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "WYm6p",
+                      "name": "passwordFieldLabel",
+                      "fill": "#a8b8d6",
+                      "content": "Password",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "PvZ6E",
+                      "name": "passwordInput",
+                      "width": "fill_container",
+                      "fill": "#0a1222",
+                      "cornerRadius": 8,
+                      "stroke": {
+                        "align": "inside",
+                        "thickness": 1,
+                        "fill": "#2a3f64"
+                      },
+                      "padding": [
+                        11,
+                        12
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ixjVj",
+                          "name": "passwordPlaceholder",
+                          "fill": "#d8e8ff",
+                          "content": "Enter password",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ASZ1Q",
+                  "name": "loginBtn",
+                  "width": "fill_container",
+                  "fill": "#184bff",
+                  "cornerRadius": 8,
+                  "padding": [
+                    11,
+                    16
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "l1vIU",
+                      "name": "loginBtnText",
+                      "fill": "#ffffff",
+                      "content": "Login",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "0yImz",
+          "x": 98,
+          "y": 128,
+          "name": "particle-01",
+          "opacity": 0.52,
+          "width": 6,
+          "height": 6,
+          "fill": "#9ED9FF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "WRFXZ",
+          "x": 202,
+          "y": 252,
+          "name": "particle-02",
+          "opacity": 0.36,
+          "width": 9,
+          "height": 9,
+          "fill": "#B8E8FF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "HQD4g",
+          "x": 316,
+          "y": 712,
+          "name": "particle-03",
+          "opacity": 0.48,
+          "width": 5,
+          "height": 5,
+          "fill": "#8FD6FF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "pvJRp",
+          "x": 468,
+          "y": 198,
+          "name": "particle-04",
+          "opacity": 0.46,
+          "width": 4,
+          "height": 4,
+          "fill": "#CDEEFF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "frxOq",
+          "x": 578,
+          "y": 602,
+          "name": "particle-05",
+          "opacity": 0.28,
+          "width": 10,
+          "height": 10,
+          "fill": "#A8E2FF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "w0xJi",
+          "x": 742,
+          "y": 148,
+          "name": "particle-06",
+          "opacity": 0.44,
+          "width": 6,
+          "height": 6,
+          "fill": "#9ED9FF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "SMaxy",
+          "x": 854,
+          "y": 764,
+          "name": "particle-07",
+          "opacity": 0.24,
+          "width": 11,
+          "height": 11,
+          "fill": "#C3ECFF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "hZERB",
+          "x": 986,
+          "y": 306,
+          "name": "particle-08",
+          "opacity": 0.4,
+          "width": 7,
+          "height": 7,
+          "fill": "#9AD9FF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "uBgvO",
+          "x": 1126,
+          "y": 638,
+          "name": "particle-09",
+          "opacity": 0.5,
+          "width": 5,
+          "height": 5,
+          "fill": "#CDEEFF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "mbkk0",
+          "x": 1242,
+          "y": 214,
+          "name": "particle-10",
+          "opacity": 0.3,
+          "width": 9,
+          "height": 9,
+          "fill": "#AFE5FF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "7NHLN",
+          "x": 168,
+          "y": 866,
+          "name": "particle-11",
+          "opacity": 0.42,
+          "width": 6,
+          "height": 6,
+          "fill": "#9ED9FF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "sBmam",
+          "x": 1340,
+          "y": 778,
+          "name": "particle-12",
+          "opacity": 0.56,
+          "width": 4,
+          "height": 4,
+          "fill": "#CDEEFF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "veHXy",
+          "x": 54,
+          "y": 486,
+          "name": "particle-13",
+          "opacity": 0.38,
+          "width": 5,
+          "height": 5,
+          "fill": "#A8E2FF",
+          "cornerRadius": 999
+        },
+        {
+          "type": "frame",
+          "id": "pVpoX",
+          "x": 1304,
+          "y": 102,
+          "name": "particle-14",
+          "opacity": 0.34,
+          "width": 7,
+          "height": 7,
+          "fill": "#B8E8FF",
+          "cornerRadius": 999
+        }
+      ]
     }
   ]
 }

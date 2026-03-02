@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260302-login13" />
+    <link rel="stylesheet" href="./styles.css?v=20260302-login15" />
   </head>
   <body>
     <div class="bg-grid" aria-hidden="true"></div>
@@ -344,7 +344,7 @@
                 <textarea
                   id="promptInput"
                   rows="6"
-                  placeholder="Type a prompt or use preset 1-4 to test different risk scenarios..."
+                  placeholder="Type a prompt or use preset 1-6 to test different adversarial scenarios..."
                 ></textarea>
               </label>
 
@@ -370,24 +370,28 @@
               </div>
 
               <div class="scenario-grid" id="scenarioGrid">
-                <button class="scenario-card level-low is-active" data-scenario="1" type="button">
-                  <span class="scenario-text">1. Benign Translation
-Low Risk</span>
+                <button class="scenario-card is-active" data-scenario="1" type="button">
+                  <span class="scenario-text">1. 英文翻譯為日文</span>
                 </button>
 
-                <button class="scenario-card level-medium" data-scenario="2" type="button">
-                  <span class="scenario-text">2. Prompt Injection
-Medium Risk</span>
+                <button class="scenario-card" data-scenario="2" type="button">
+                  <span class="scenario-text">2. 老奶奶攻擊</span>
                 </button>
 
-                <button class="scenario-card level-high" data-scenario="3" type="button">
-                  <span class="scenario-text">3. Credential Exfiltration
-High Risk</span>
+                <button class="scenario-card" data-scenario="3" type="button">
+                  <span class="scenario-text">3. 典型 Prompt Injection</span>
                 </button>
 
-                <button class="scenario-card level-medium" data-scenario="4" type="button">
-                  <span class="scenario-text">4. Jailbreak Chain
-Medium Risk</span>
+                <button class="scenario-card" data-scenario="4" type="button">
+                  <span class="scenario-text">4. 機敏資料（台灣手機號碼遮罩）</span>
+                </button>
+
+                <button class="scenario-card" data-scenario="5" type="button">
+                  <span class="scenario-text">5. 主題識別：金融議題 (內建)</span>
+                </button>
+
+                <button class="scenario-card" data-scenario="6" type="button">
+                  <span class="scenario-text">6. 主題識別：台灣政治議題 (客製化)</span>
                 </button>
               </div>
             </div>
@@ -494,6 +498,6 @@ Medium Risk</span>
       </main>
     </div>
 
-    <script type="module" src="./app.js?v=20260302-login13"></script>
+    <script type="module" src="./app.js?v=20260302-login15"></script>
   </body>
 </html>

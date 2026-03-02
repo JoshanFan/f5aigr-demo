@@ -51,6 +51,25 @@ docker compose up -d --build
 curl -i http://localhost:3000/healthz
 ```
 
+## Optional: Prefill Project ID / API Token
+
+To prefill settings fields at startup without hardcoding credentials in HTML/JS, define environment variables in a local `.env` file:
+
+```bash
+DEMO_PROJECT_ID=project-app-xxxxxxxx
+DEMO_API_TOKEN=your_guardrails_bearer_token
+```
+
+Then restart:
+
+```bash
+docker compose up -d --build --force-recreate
+```
+
+Notes:
+- Prefill values are injected at container startup into `runtime-config.js`.
+- If browser `sessionStorage` already has saved settings, saved values take precedence.
+
 ## Runtime Endpoints
 
 - Frontend: `GET /`
@@ -84,6 +103,7 @@ Run tests:
 
 ```bash
 node --test auth-utils.test.js scan-utils.test.js nginx/orchestrator.test.js dockerfile-assets.test.js login-performance.test.js logout-feature.test.js
+node --test runtime-prefill.test.js adversarial-samples.test.js
 ```
 
 Syntax checks:
@@ -116,6 +136,8 @@ Required GitHub repository secrets:
 - `HARBOR_USERNAME`
 - `HARBOR_PASSWORD`
 - `SSH_KEY`
+- `DEMO_PROJECT_ID` (optional, for settings prefill)
+- `DEMO_API_TOKEN` (optional, for settings prefill)
 
 Trigger:
 

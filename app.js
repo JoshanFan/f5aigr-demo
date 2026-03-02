@@ -296,6 +296,27 @@ function loadSettings() {
   }
 }
 
+function applyRuntimePrefill() {
+  const runtimePrefill = window.__F5_DEMO_PREFILL__;
+  if (!runtimePrefill || typeof runtimePrefill !== "object") {
+    return;
+  }
+
+  if (!dom.projectId.value.trim() && typeof runtimePrefill.projectId === "string") {
+    const projectId = runtimePrefill.projectId.trim();
+    if (projectId) {
+      dom.projectId.value = projectId;
+    }
+  }
+
+  if (!dom.apiToken.value.trim() && typeof runtimePrefill.apiToken === "string") {
+    const apiToken = runtimePrefill.apiToken.trim();
+    if (apiToken) {
+      dom.apiToken.value = apiToken;
+    }
+  }
+}
+
 function hasCredentials() {
   return Boolean(dom.projectId.value.trim() && dom.apiToken.value.trim());
 }
@@ -1820,6 +1841,7 @@ function initListeners() {
 
 function init() {
   loadSettings();
+  applyRuntimePrefill();
   initListeners();
   applyScenario(state.selectedScenario);
   renderResult({

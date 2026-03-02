@@ -2,6 +2,9 @@ services:
   f5ai-demo:
     build: .
     image: f5ai-guardrails-demo:latest
+    environment:
+      DEMO_PROJECT_ID: ${DEMO_PROJECT_ID:-}
+      DEMO_API_TOKEN: ${DEMO_API_TOKEN:-}
     ports:
       - "3000:3000"
     restart: unless-stopped

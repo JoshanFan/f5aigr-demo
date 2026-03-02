@@ -16,9 +16,12 @@ COPY styles.css    /usr/share/nginx/html/
 COPY app.js        /usr/share/nginx/html/
 COPY auth-utils.js /usr/share/nginx/html/
 COPY scan-utils.js /usr/share/nginx/html/
+COPY runtime-config.js /usr/share/nginx/html/
+COPY runtime-config.js.template /usr/share/nginx/html/
 
 # Copy nginx config template
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
+COPY --chmod=755 docker-entrypoint.d/20-runtime-config.sh /docker-entrypoint.d/20-runtime-config.sh
 
 EXPOSE 3000
 

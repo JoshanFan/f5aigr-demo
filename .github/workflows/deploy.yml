@@ -88,7 +88,7 @@ jobs:
           username: root
           key: ${{ secrets.SSH_KEY }}
           script_stop: true
-          envs: HARBOR_USERNAME,HARBOR_PASSWORD
+          envs: HARBOR_USERNAME,HARBOR_PASSWORD,DEMO_PROJECT_ID,DEMO_API_TOKEN
           script: |
             set -eu
             IMAGE_REPO="${{ needs.build_push.outputs.image_repo }}"
@@ -103,6 +103,8 @@ jobs:
             docker run -d \
               --name f5aigr-demo \
               --restart unless-stopped \
+              -e DEMO_PROJECT_ID="$DEMO_PROJECT_ID" \
+              -e DEMO_API_TOKEN="$DEMO_API_TOKEN" \
               -p 3000:3000 \
               "$IMAGE_REPO:$IMAGE_TAG"
 
@@ -110,3 +112,5 @@ jobs:
         env:
           HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
           HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+          DEMO_PROJECT_ID: ${{ secrets.DEMO_PROJECT_ID }}
+          DEMO_API_TOKEN: ${{ secrets.DEMO_API_TOKEN }}

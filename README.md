@@ -10,9 +10,11 @@ The app runs behind NGINX and uses an njs orchestrator to stream stage events to
 ## What This Repo Contains
 
 - Single-page frontend (`index.html`, `styles.css`, `app.js`)
+- Login/auth helper (`auth-utils.js`)
 - NGINX config + njs orchestrator (`nginx/default.conf.template`, `nginx/orchestrator.js`)
 - Dockerized runtime (`Dockerfile`, `docker-compose.yml`)
-- Utility and unit tests (`scan-utils.js`, `scan-utils.test.js`, `nginx/orchestrator.test.js`)
+- Utility and unit tests (`scan-utils.js`, `scan-utils.test.js`, `auth-utils.test.js`, `nginx/orchestrator.test.js`)
+- Runtime guard tests for packaging/perf/logout (`dockerfile-assets.test.js`, `login-performance.test.js`, `logout-feature.test.js`)
 
 ## Key Features
 
@@ -21,6 +23,9 @@ The app runs behind NGINX and uses an njs orchestrator to stream stage events to
 - Guardrail verdict + scanner breakdown + raw JSON tab
 - Dynamic LLM model label from API response payload
 - Connection health check in settings panel
+- Login gate with demo credential validation
+- Session-based auth state in browser tab (`sessionStorage`)
+- Header `Logout` action that clears session and returns to login gate
 
 ## Requirements
 
@@ -57,18 +62,28 @@ curl -i http://localhost:3000/healthz
 
 ## How to Use the Demo
 
-1. Fill **Project ID** and **API Token**, click **Save**.
-2. (OOB only) Fill **OpenRouter API Key** and choose model.
-3. Pick mode (**Inline** or **Out-of-Band**).
-4. Enter prompt or click a preset sample.
-5. Click **Send** and observe architecture flow + result panel.
+1. Log in with demo credentials:
+   - Username: `joshan`
+   - Password: `F%AIP@ssw0rd`
+2. Fill **Project ID** and **API Token**, click **Save**.
+3. (OOB only) Fill **OpenRouter API Key** and choose model.
+4. Pick mode (**Inline** or **Out-of-Band**).
+5. Enter prompt or click a preset sample.
+6. Click **Send** and observe architecture flow + result panel.
+7. Click **Logout** in the header to clear session and return to login page.
+
+## Login Session Behavior
+
+- Auth state is stored in `sessionStorage` key `f5_guardrails_demo_auth_v1`.
+- Session is tab-scoped and cleared when the tab/window is closed.
+- Logout explicitly clears that key and re-shows the login gate.
 
 ## Development
 
 Run tests:
 
 ```bash
-node --test scan-utils.test.js nginx/orchestrator.test.js
+node --test auth-utils.test.js scan-utils.test.js nginx/orchestrator.test.js dockerfile-assets.test.js login-performance.test.js logout-feature.test.js
 ```
 
 Syntax checks:

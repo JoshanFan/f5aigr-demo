@@ -10,17 +10,74 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260301-flow10" />
+    <link rel="stylesheet" href="./styles.css?v=20260302-login13" />
   </head>
   <body>
     <div class="bg-grid" aria-hidden="true"></div>
 
-    <div class="app-shell">
+    <div id="loginGate" class="login-gate">
+      <div class="login-space" aria-hidden="true">
+        <span class="space-particle" style="--x: 7; --y: 12; --size: 4; --drift-x: 2.4; --drift-y: -2.2; --duration: 12s; --delay: -1.2s; --alpha: .6; --blur: 0px;"></span>
+        <span class="space-particle" style="--x: 14; --y: 30; --size: 7; --drift-x: -2.2; --drift-y: 2.8; --duration: 17s; --delay: -6.3s; --alpha: .45; --blur: .2px;"></span>
+        <span class="space-particle" style="--x: 22; --y: 76; --size: 5; --drift-x: 2.8; --drift-y: -2.5; --duration: 14s; --delay: -2.5s; --alpha: .52; --blur: .1px;"></span>
+        <span class="space-particle" style="--x: 31; --y: 20; --size: 3; --drift-x: -2.2; --drift-y: 2.3; --duration: 11s; --delay: -8.1s; --alpha: .44; --blur: 0px;"></span>
+        <span class="space-particle" style="--x: 39; --y: 62; --size: 8; --drift-x: 1.8; --drift-y: -1.6; --duration: 19s; --delay: -5.2s; --alpha: .36; --blur: .4px;"></span>
+        <span class="space-particle" style="--x: 47; --y: 46; --size: 5; --drift-x: -2.8; --drift-y: 2.1; --duration: 16s; --delay: -3.3s; --alpha: .5; --blur: .2px;"></span>
+        <span class="space-particle" style="--x: 56; --y: 14; --size: 4; --drift-x: 2.1; --drift-y: 1.8; --duration: 13s; --delay: -9.2s; --alpha: .5; --blur: 0px;"></span>
+        <span class="space-particle" style="--x: 64; --y: 72; --size: 9; --drift-x: -1.8; --drift-y: -2.6; --duration: 21s; --delay: -4.8s; --alpha: .34; --blur: .6px;"></span>
+      </div>
+
+      <section class="panel login-panel" aria-labelledby="loginTitle">
+        <div class="login-head">
+          <p id="loginTitle" class="eyebrow login-eyebrow">F5 AI Runtime Security <span>DEMO</span></p>
+          <p class="login-subtitle">Sign in to continue to the demo console.</p>
+        </div>
+
+        <form id="loginForm" class="login-form" novalidate>
+          <label class="field">
+            <span>Username</span>
+            <input
+              id="loginUsername"
+              type="text"
+              placeholder="Enter username"
+              autocomplete="username"
+              required
+            />
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input
+              id="loginPassword"
+              type="password"
+              placeholder="Enter password"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+
+          <button id="loginBtn" class="btn-primary login-btn" type="submit">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 11V8a5 5 0 0 1 10 0v3"></path>
+              <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+              <circle cx="12" cy="16" r="1"></circle>
+            </svg>
+            Login
+          </button>
+          <p id="loginState" class="login-state" role="status" aria-live="polite">
+            Enter your credentials to continue.
+          </p>
+        </form>
+      </section>
+    </div>
+
+    <div id="appShell" class="app-shell" hidden>
       <header class="panel header-panel">
-        <div>
+        <div class="header-main">
           <p class="eyebrow">F5 AI Runtime Security</p>
           <h1>F5 AI Guardrail Demo</h1>
         </div>
+        <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
       </header>
 
       <main id="main">
@@ -437,6 +494,6 @@ Medium Risk</span>
       </main>
     </div>
 
-    <script type="module" src="./app.js?v=20260301-flow10"></script>
+    <script type="module" src="./app.js?v=20260302-login13"></script>
   </body>
 </html>

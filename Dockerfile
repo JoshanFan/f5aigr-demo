@@ -14,6 +14,7 @@ COPY nginx/orchestrator.js /etc/nginx/njs/orchestrator.js
 COPY index.html    /usr/share/nginx/html/
 COPY styles.css    /usr/share/nginx/html/
 COPY app.js        /usr/share/nginx/html/
+COPY auth-utils.js /usr/share/nginx/html/
 COPY scan-utils.js /usr/share/nginx/html/
 
 # Copy nginx config template

@@ -1,6 +1,8 @@
 import { mapPromptApiResult, mapScanApiResult, resolveScannerName } from "./scan-utils.js";
+import { isValidDemoLogin } from "./auth-utils.js";
 
 const SETTINGS_STORAGE_KEY = "f5_guardrails_demo_settings_v2";
+const AUTH_STORAGE_KEY = "f5_guardrails_demo_auth_v1";
 const CONNECTION_CHECK_INTERVAL_MS = 30000;
 const SSE_ENDPOINTS = {
   inline: "/inline/chat",
@@ -9,6 +11,7 @@ const SSE_ENDPOINTS = {
 const GUARDRAIL_CHECK_ENDPOINT = "/backend/v1/scans";
 
 const state = {
+  isAuthenticated: false,
   mode: "inline",
   isScanning: false,
   resultTab: "summary",
@@ -53,8 +56,17 @@ const ANALYTICS_HISTORY_LIMIT = 40;
 const SSE_TOTAL_TIMEOUT_MS = 90000;
 const SSE_IDLE_TIMEOUT_MS = 25000;
 let copyJsonResetTimerId = null;
+let loginSubmitBound = false;
 
 const dom = {
+  appShell: document.getElementById("appShell"),
+  loginGate: document.getElementById("loginGate"),
+  loginForm: document.getElementById("loginForm"),
+  loginUsername: document.getElementById("loginUsername"),
+  loginPassword: document.getElementById("loginPassword"),
+  loginBtn: document.getElementById("loginBtn"),
+  logoutBtn: document.getElementById("logoutBtn"),
+  loginState: document.getElementById("loginState"),
   projectId: document.getElementById("projectId"),
   apiToken: document.getElementById("apiToken"),
   saveSettingsBtn: document.getElementById("saveSettingsBtn"),
@@ -111,6 +123,132 @@ const dom = {
   engineerStageTrace: document.getElementById("engineerStageTrace"),
   engineerRawJson: document.getElementById("engineerRawJson"),
 };
+
+function setLoginState(text, status = "idle") {
+  if (!dom.loginState) {
+    return;
+  }
+  dom.loginState.textContent = text;
+  dom.loginState.classList.remove("is-error", "is-success");
+  if (status === "error") {
+    dom.loginState.classList.add("is-error");
+  } else if (status === "success") {
+    dom.loginState.classList.add("is-success");
+  }
+}
+
+function setAuthState(isAuthenticated) {
+  state.isAuthenticated = Boolean(isAuthenticated);
+  document.body.classList.toggle("login-mode", !state.isAuthenticated);
+  if (dom.loginGate) {
+    dom.loginGate.hidden = state.isAuthenticated;
+  }
+  if (dom.appShell) {
+    dom.appShell.hidden = !state.isAuthenticated;
+  }
+}
+
+function saveAuthSession() {
+  try {
+    sessionStorage.setItem(AUTH_STORAGE_KEY, "ok");
+  } catch (_error) {
+    // Ignore storage errors.
+  }
+}
+
+function clearAuthSession() {
+  try {
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch (_error) {
+    // Ignore storage errors.
+  }
+}
+
+function hasAuthSession() {
+  try {
+    return sessionStorage.getItem(AUTH_STORAGE_KEY) === "ok";
+  } catch (_error) {
+    return false;
+  }
+}
+
+function ensureLoginSubmitListener() {
+  if (!dom.loginForm || loginSubmitBound) {
+    return;
+  }
+  dom.loginForm.addEventListener("submit", handleLoginSubmit);
+  loginSubmitBound = true;
+}
+
+function handleLoginSubmit(event) {
+  event.preventDefault();
+
+  if (!dom.loginUsername || !dom.loginPassword || !dom.loginBtn) {
+    return;
+  }
+
+  const username = dom.loginUsername.value;
+  const password = dom.loginPassword.value;
+
+  if (!username.trim()) {
+    setLoginState("Please enter your username.", "error");
+    dom.loginUsername.focus();
+    return;
+  }
+
+  if (!password) {
+    setLoginState("Please enter your password.", "error");
+    dom.loginPassword.focus();
+    return;
+  }
+
+  dom.loginBtn.disabled = true;
+  if (isValidDemoLogin(username, password)) {
+    saveAuthSession();
+    setLoginState("Login successful. Redirecting...", "success");
+    setAuthState(true);
+    if (dom.projectId) {
+      dom.projectId.focus();
+    }
+    return;
+  }
+
+  dom.loginBtn.disabled = false;
+  setLoginState("Invalid username or password.", "error");
+  dom.loginPassword.focus();
+  dom.loginPassword.select();
+}
+
+function initLoginGate() {
+  ensureLoginSubmitListener();
+  const authed = hasAuthSession();
+  setAuthState(authed);
+  if (authed) {
+    return;
+  }
+
+  setLoginState("Enter your credentials to continue.");
+  if (dom.loginUsername) {
+    dom.loginUsername.focus();
+  }
+}
+
+function handleLogoutClick() {
+  clearAuthSession();
+  stopConnectionMonitoring();
+  setAuthState(false);
+  setLoginState("Enter your credentials to continue.");
+  if (dom.loginBtn) {
+    dom.loginBtn.disabled = false;
+  }
+  if (dom.loginPassword) {
+    dom.loginPassword.value = "";
+  }
+  ensureLoginSubmitListener();
+  if (dom.loginUsername) {
+    dom.loginUsername.focus();
+  }
+}
 
 function saveSettings() {
   const payload = {
@@ -1647,6 +1785,9 @@ function initListeners() {
   });
 
   dom.scanBtn.addEventListener("click", handleScan);
+  if (dom.logoutBtn) {
+    dom.logoutBtn.addEventListener("click", handleLogoutClick);
+  }
   if (dom.copyRawJsonBtn) {
     dom.copyRawJsonBtn.addEventListener("click", handleCopyRawJson);
   }
@@ -1704,3 +1845,4 @@ function init() {
 }
 
 init();
+initLoginGate();

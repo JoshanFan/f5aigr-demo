@@ -24,6 +24,7 @@ jobs:
       - name: Remove private files
         run: |
           rm -rf .github/workflows/deploy.yml
+          rm -rf .github/workflows/mirror.yml
           rm -f frontend.pen
 
       - name: Push to public repo

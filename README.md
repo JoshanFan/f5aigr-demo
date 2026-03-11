@@ -94,7 +94,7 @@ Open **http://localhost:3000** in your browser.
 - Click **Save** in Settings and wait for the status to show **Connected**
 - Choose **Inline** or **OOB** mode, enter a prompt, and click **Send**
 
-> **Note:** Inline mode requires Guardrails SaaS to call back into your NGINX endpoint (`/v1/chat/completions`). When running locally, this callback cannot reach `localhost`, so the LLM proxy stages (steps 3–4) will be skipped in the flow animation. For the full inline animation, deploy NGINX on a publicly reachable host. OOB mode works fully in local setups.
+> **Note:** In Inline mode, the flow animation for steps 3–4 (LLM proxy) will be incomplete when running locally, because Guardrails SaaS cannot call back into `localhost`. The scan results and verdicts are unaffected — only the animation is partial. For the full flow animation, deploy NGINX on a publicly reachable host.
 
 ### Stop the demo
 

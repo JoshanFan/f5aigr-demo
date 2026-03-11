@@ -42,55 +42,77 @@ Browser -> NGINX -> Guardrails (pre-scan)
   If blocked: NGINX -> Browser (blocked)
 ```
 
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose (included with Docker Desktop)
+- A valid F5 AI Guardrails **Project ID** and **API Token**
+- (Optional) An [OpenRouter](https://openrouter.ai/) API key — required for OOB mode
+
 ## Quick Start
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/JoshanFan/f5aigr-demo.git
+cd f5aigr-demo
+```
+
+### 2. Create a `.env` file with your credentials
+
+```bash
+cat > .env << 'EOF'
+DEMO_PROJECT_ID=project-app-xxxxxxxx
+DEMO_API_TOKEN=your_guardrails_bearer_token
+EOF
+```
+
+Replace the values above with your actual Project ID and API Token. These will be prefilled in the demo UI so you don't have to enter them manually.
+
+### 3. Start the containers
 
 ```bash
 docker compose up -d --build
 ```
 
-- Frontend: `http://localhost:3000`
-- Health check: `http://localhost:8080/healthz`
+### 4. Verify everything is running
 
-Stop:
+```bash
+# Check container status
+docker compose ps
+
+# Check NGINX health
+curl -i http://localhost:8080/healthz
+# Expected: HTTP/1.1 200 OK
+```
+
+### 5. Open the demo
+
+Open **http://localhost:3000** in your browser.
+
+- Log in with the default credentials: `admin` / `F5aidemo`
+- The **Project ID** and **API Token** should already be prefilled from your `.env`
+- Click **Save** in Settings and wait for the status to show **Connected**
+- Choose **Inline** or **OOB** mode, enter a prompt, and click **Send**
+
+### Stop the demo
 
 ```bash
 docker compose down
 ```
 
-## Requirements
-
-- Docker and Docker Compose
-- A valid F5 AI Guardrails **Project ID** and **API Token**
-- An OpenRouter API key (for OOB mode)
-
 ## Configuration
 
-### Option A: Enter values in the UI
+### Credentials
 
-After logging in, fill in **Project ID**, **API Token**, and optionally the **OpenRouter API Key** and **Model** in the Settings panel. Click **Save** and wait for **Connected**.
+You can enter or change credentials in the Settings panel at any time. Values saved in the browser override the `.env` prefills.
 
-### Option B: Prefill via environment variables
+For OOB mode, you also need to fill in the **OpenRouter API Key** and **Model** in Settings.
 
-Create a `.env` file (not committed to git):
+### API Base URL
 
-```bash
-DEMO_PROJECT_ID=project-app-xxxxxxxx
-DEMO_API_TOKEN=your_guardrails_bearer_token
-```
+The default `docker-compose.yml` sets `API_BASE_URL=http://localhost:8080`, so the frontend talks directly to the NGINX container.
 
-Optional:
-
-```bash
-API_BASE_URL=http://localhost:8080
-```
-
-Then:
-
-```bash
-docker compose up -d --build --force-recreate
-```
-
-If `API_BASE_URL` is empty, the frontend auto-derives it from the current origin (e.g. `http://localhost:3000` → `http://localhost:3000/api`). The default `docker-compose.yml` sets it to `http://localhost:8080`.
+If `API_BASE_URL` is empty, the frontend auto-derives it from the current origin (e.g. `http://localhost:3000` → `http://localhost:3000/api`). This is useful for production deployments where a reverse proxy sits in front.
 
 ## Demo Usage
 

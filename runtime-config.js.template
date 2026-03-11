@@ -1,4 +1,5 @@
 window.__F5_DEMO_PREFILL__ = Object.freeze({
   projectId: "${DEMO_PROJECT_ID}",
   apiToken: "${DEMO_API_TOKEN}",
+  apiBaseUrl: "${API_BASE_URL}",
 });

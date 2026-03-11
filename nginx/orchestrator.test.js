@@ -88,3 +88,36 @@ test("getLLMResponseModel falls back to selected model when model is missing", (
     "openai/gpt-4o-mini",
   );
 });
+
+test("applyCorsHeaders adds browser-visible CORS headers for mapped origins", () => {
+  const request = {
+    variables: {
+      cors_origin: "http://localhost:3000",
+    },
+    headersOut: {},
+  };
+
+  orchestrator.applyCorsHeaders(request);
+
+  assert.equal(request.headersOut["Access-Control-Allow-Origin"], "http://localhost:3000");
+  assert.equal(request.headersOut["Access-Control-Allow-Methods"], "GET, POST, OPTIONS");
+  assert.equal(request.headersOut["Access-Control-Allow-Headers"], "Content-Type, Authorization");
+  assert.equal(request.headersOut.Vary, "Origin");
+});
+
+test("applyCorsHeaders skips empty mapped origins", () => {
+  const request = {
+    variables: {
+      cors_origin: "",
+    },
+    headersOut: {},
+  };
+
+  orchestrator.applyCorsHeaders(request);
+
+  assert.deepEqual(request.headersOut, {});
+});
+
+test("orchestrator exports llmProxy function", () => {
+  assert.equal(typeof orchestrator.llmProxy, "function");
+});

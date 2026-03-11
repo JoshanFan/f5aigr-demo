@@ -10,6 +10,12 @@ const SSE_ENDPOINTS = {
 };
 const GUARDRAIL_CHECK_ENDPOINT = "/backend/v1/scans";
 
+function getApiBaseUrl() {
+  const prefill = window.__F5_DEMO_PREFILL__;
+  const base = (prefill && prefill.apiBaseUrl) || "";
+  return base.replace(/\/+$/, "");
+}
+
 const state = {
   isAuthenticated: false,
   mode: "inline",
@@ -1053,51 +1059,50 @@ function getInlineStageTimeline(stage) {
           label: "Guardrail decision finalized",
         },
       ];
-    case "llm_start":
-      return [];
-    case "llm_response":
+    case "llm_proxy_start":
       return [
         {
           stepNumber: 3,
           circles: ["i-n3"],
           phase: "request",
           durationMs: 220,
-          label: "Step 3 • Guardrails -> LLM",
+          label: "Step 3 \u2022 Guardrails -> LLM",
         },
         {
           nodes: ["i-llm"],
           phase: "request",
           durationMs: 240,
-          persist: false,
           label: "LLM receives request",
+          hold: true,
         },
+      ];
+    case "llm_proxy_done":
+      return [
         {
           stepNumber: 4,
           circles: ["i-n4"],
           phase: "response",
           durationMs: 220,
-          label: "Step 4 • LLM -> Guardrails",
+          label: "Step 4 \u2022 LLM -> Guardrails",
         },
         {
           nodes: ["i-core"],
           phase: "response",
           durationMs: 240,
           persist: false,
-          label: "F5 AI Runtime receives response",
+          label: "F5 AI Runtime receives LLM response",
         },
-        {
-          nodes: ["i-scanner"],
-          phase: "response",
-          durationMs: 240,
-          persist: false,
-          label: "F5/Custom Guardrails validates response",
-        },
+      ];
+    case "llm_start":
+      return [];
+    case "llm_response":
+      return [
         {
           stepNumber: 5,
           circles: ["i-n5"],
           phase: "response",
           durationMs: 220,
-          label: "Step 5 • Guardrails -> NGINX",
+          label: "Step 5 \u2022 Guardrails -> NGINX",
         },
         {
           nodes: ["i-nginx"],
@@ -1433,7 +1438,7 @@ async function requestGuardrails({ endpoint, projectId, token, input, verbose = 
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(endpoint, {
+    const response = await fetch(getApiBaseUrl() + endpoint, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1613,7 +1618,7 @@ async function handleScan() {
     resetIdleWatchdog();
     dom.scanState.textContent = "Dispatching request to pipeline...";
 
-    const responsePromise = fetch(endpoint, {
+    const responsePromise = fetch(getApiBaseUrl() + endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1711,6 +1716,9 @@ async function handleScan() {
         }
       }
     }
+
+    // Wait for flow animation to finish before rendering results
+    await animationChain;
 
     // Render final results
     if (guardrailPayload) {

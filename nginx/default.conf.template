@@ -1,39 +1,40 @@
 js_import orchestrator from /etc/nginx/njs/orchestrator.js;
 js_var $guardrails_upstream "https://us1.calypsoai.app";
-js_var $calypso_auth '';
+js_shared_dict_zone zone=llm_signals:1m;
 js_fetch_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
 
-subrequest_output_buffer_size 64k;
-
-# Upstream pool with keepalive — TCP+TLS connections are reused across requests
-upstream calypso_api {
-    server us1.calypsoai.app:443;
-    keepalive 16;
-    keepalive_timeout 60s;
+map $http_origin $cors_origin {
+    default "";
+    "~^https?://localhost(:[0-9]+)?$" $http_origin;
+    "~^https?://f5aigrdemo\.xxlab\.run$" $http_origin;
+    "~^https?://openrouterproxy\.xxlab\.run$" $http_origin;
 }
 
 server {
-    listen 3000;
+    listen 8080;
     server_name _;
 
     resolver 8.8.8.8 1.1.1.1 ipv6=off valid=60s;
     resolver_timeout 3s;
 
-    root /usr/share/nginx/html;
-    index index.html;
-
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # CORS
+    add_header Access-Control-Allow-Origin $cors_origin always;
+    add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Content-Type, Authorization" always;
+
+    # Preflight
+    if ($request_method = OPTIONS) {
+        return 204;
+    }
 
     location = /healthz {
         access_log off;
         add_header Content-Type text/plain;
         return 200 "ok";
-    }
-
-    location / {
-        try_files $uri $uri/ /index.html;
     }
 
     location /backend/ {
@@ -80,43 +81,19 @@ server {
         tcp_nodelay on;
     }
 
-    # Internal proxy locations for Calypso API (used via r.subrequest from njs)
-    # Static proxy_pass = DNS resolved once at startup
-    # upstream calypso_api = keepalive TCP+TLS connection reuse
-    location = /_internal/calypso_prompts {
-        internal;
-        proxy_pass https://calypso_api/backend/v1/prompts;
-        proxy_http_version 1.1;
-        proxy_ssl_server_name on;
-        proxy_ssl_name us1.calypsoai.app;
-        proxy_ssl_session_reuse on;
-        proxy_set_header Host us1.calypsoai.app;
-        proxy_set_header Authorization $calypso_auth;
-        proxy_set_header Content-Type "application/json";
-        proxy_set_header Connection "";
-        proxy_buffer_size 32k;
-        proxy_buffers 4 32k;
-        proxy_busy_buffers_size 64k;
-        proxy_read_timeout 30s;
-        proxy_send_timeout 10s;
-    }
+    # LLM proxy endpoint (called externally by Guardrails)
+    location = /v1/chat/completions {
+        default_type application/json;
 
-    location = /_internal/calypso_scans {
-        internal;
-        proxy_pass https://calypso_api/backend/v1/scans;
-        proxy_http_version 1.1;
-        proxy_ssl_server_name on;
-        proxy_ssl_name us1.calypsoai.app;
-        proxy_ssl_session_reuse on;
-        proxy_set_header Host us1.calypsoai.app;
-        proxy_set_header Authorization $calypso_auth;
-        proxy_set_header Content-Type "application/json";
-        proxy_set_header Connection "";
-        proxy_buffer_size 32k;
-        proxy_buffers 4 32k;
-        proxy_busy_buffers_size 64k;
-        proxy_read_timeout 30s;
-        proxy_send_timeout 10s;
+        if ($http_authorization = '') {
+            return 401 '{"error":"missing authorization"}';
+        }
+
+        js_content orchestrator.llmProxy;
+
+        client_body_in_single_buffer on;
+        client_body_buffer_size 64k;
+        client_max_body_size 64k;
     }
 
 

@@ -1,0 +1,23 @@
+FROM node:alpine
+
+RUN apk add --no-cache gettext && npm install -g serve
+
+WORKDIR /app
+
+COPY index.html .
+COPY styles.css .
+COPY app.js .
+COPY auth-utils.js .
+COPY scan-utils.js .
+COPY runtime-config.js .
+COPY runtime-config.js.template .
+COPY serve.json .
+
+COPY --chmod=755 docker-entrypoint.d/20-runtime-config.sh /docker-entrypoint.d/20-runtime-config.sh
+
+EXPOSE 3000
+
+ENV RUNTIME_CONFIG_DIR=/app
+
+# Run envsubst for runtime config, then serve
+CMD ["/bin/sh", "-c", "/docker-entrypoint.d/20-runtime-config.sh && serve -s /app -l 3000"]

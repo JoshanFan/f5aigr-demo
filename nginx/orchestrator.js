@@ -57,7 +57,32 @@ function emitStage(r, stage, data) {
   sendSSE(r, payload);
 }
 
+function applyCorsHeaders(r) {
+  var corsOrigin =
+    r &&
+    r.variables &&
+    typeof r.variables.cors_origin === "string"
+      ? r.variables.cors_origin
+      : "";
+
+  if (!corsOrigin) {
+    return;
+  }
+
+  r.headersOut["Access-Control-Allow-Origin"] = corsOrigin;
+  r.headersOut["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+  r.headersOut["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+
+  var varyHeader = String(r.headersOut["Vary"] || "");
+  if (!varyHeader) {
+    r.headersOut["Vary"] = "Origin";
+  } else if (varyHeader.indexOf("Origin") === -1) {
+    r.headersOut["Vary"] = varyHeader + ", Origin";
+  }
+}
+
 function initSSE(r) {
+  applyCorsHeaders(r);
   r.headersOut["Content-Type"] = "text/event-stream";
   r.headersOut["Cache-Control"] = "no-cache";
   r.headersOut["Connection"] = "keep-alive";
@@ -91,25 +116,37 @@ function parseBody(r) {
   }
 }
 
-// Use r.subrequest via NGINX static proxy locations (upstream keepalive + SSL session reuse)
-// No per-request DNS resolution — resolved once at startup
+// Use ngx.fetch() with resolver ipv6=off to avoid IPv6 failures in Docker
 async function calypsoSubrequest(r, path, token, body, label) {
-  r.variables.calypso_auth = "Bearer " + token;
+  var base = String(r.variables.guardrails_upstream || "https://us1.calypsoai.app").replace(/\/+$/, "");
+  var urlMap = {
+    "/_internal/calypso_prompts": base + "/backend/v1/prompts",
+    "/_internal/calypso_scans": base + "/backend/v1/scans",
+  };
+  var url = urlMap[path];
+  if (!url) {
+    throw new Error(label + " unknown path: " + path);
+  }
 
-  var reply = await withTimeout(
-    r.subrequest(path, {
+  var res = await withTimeout(
+    ngx.fetch(url, {
       method: "POST",
+      headers: {
+        Authorization: "Bearer " + token,
+        "Content-Type": "application/json",
+      },
       body: body,
     }),
     GUARDRAIL_TIMEOUT_MS,
     label
   );
 
-  if (reply.status >= 400) {
-    throw new Error(label + " failed (" + reply.status + "): " + String(reply.responseText || "").substring(0, 200));
+  if (res.status >= 400) {
+    var text = await res.text();
+    throw new Error(label + " failed (" + res.status + "): " + text.substring(0, 200));
   }
 
-  return JSON.parse(reply.responseText);
+  return await withTimeout(res.json(), 5000, label + " parse");
 }
 
 async function callGuardrailProxy(r, token, project, input) {
@@ -355,35 +392,102 @@ async function inlineChat(r) {
     return;
   }
 
-  var upstream = r.variables.guardrails_upstream;
-
   try {
-    // 1. Prompt + inline guardrails via Calypso Prompts API
+    // 1. Start guardrail phase
     emitStage(r, "guardrail_start");
     emitStage(r, "inline_dispatch", { model: body.model });
     emitStage(r, "inline_waiting");
-    var promptResult = await callPromptProxy(
+
+    // Clear previous signals
+    ngx.shared.llm_signals.delete("start");
+    ngx.shared.llm_signals.delete("end");
+
+    // Fire Guardrails subrequest (returns Promise)
+    var guardrailPromise = callPromptProxy(
       r,
       body.guardrailToken,
       body.project,
       body.input
-    );
+    ).then(function (res) {
+      return { type: "done", value: res };
+    });
+
+    var promptResult = null;
+    var llmStartEmitted = false;
+    var llmEndEmitted = false;
+
+    // Poll loop: check shared dict every 200ms while waiting for Guardrails
+    while (!promptResult) {
+      var raced = await Promise.race([
+        guardrailPromise,
+        new Promise(function (resolve) {
+          setTimeout(function () {
+            resolve({ type: "tick" });
+          }, 200);
+        }),
+      ]);
+
+      if (raced.type === "done") {
+        promptResult = raced.value;
+      } else {
+        // Check for LLM proxy start signal from shared dict
+        if (!llmStartEmitted) {
+          var startTs = ngx.shared.llm_signals.get("start");
+          if (startTs) {
+            emitStage(r, "llm_proxy_start", { ts: parseInt(startTs) });
+            llmStartEmitted = true;
+          }
+        }
+        // Check for LLM proxy end signal from shared dict
+        if (llmStartEmitted && !llmEndEmitted) {
+          var endTs = ngx.shared.llm_signals.get("end");
+          if (endTs) {
+            emitStage(r, "llm_proxy_done", { ts: parseInt(endTs) });
+            llmEndEmitted = true;
+          }
+        }
+      }
+    }
+
+    // 2. Guardrails returned — check blocked FIRST
+    var blocked = isBlocked(promptResult);
+
+    // For non-blocked: emit any signals that arrived but weren't caught in loop
+    if (!blocked) {
+      if (!llmStartEmitted) {
+        var finalStart = ngx.shared.llm_signals.get("start");
+        if (finalStart) {
+          emitStage(r, "llm_proxy_start", { ts: parseInt(finalStart) });
+          llmStartEmitted = true;
+        }
+      }
+      if (!llmEndEmitted) {
+        var finalEnd = ngx.shared.llm_signals.get("end");
+        if (finalEnd) {
+          emitStage(r, "llm_proxy_done", { ts: parseInt(finalEnd) });
+          llmEndEmitted = true;
+        }
+      }
+    }
+
     emitStage(r, "guardrail_result", { guardrail: promptResult });
 
-    // 2. Check blocked
-    if (isBlocked(promptResult)) {
+    // 3. Blocked — return immediately, no LLM steps shown
+    if (blocked) {
       emitStage(r, "blocked", { reason: "pre-scan blocked" });
       emitStage(r, "done");
       r.finish();
       return;
     }
 
-    // 3. LLM response already included in prompt result
+    // 4. Extract LLM response from prompt result
     var content = getPromptResponseContent(promptResult);
     var resolvedModel = getPromptResponseModel(promptResult, body.model);
-    emitStage(r, "llm_response", { llm: { model: resolvedModel, content: content } });
+    emitStage(r, "llm_response", {
+      llm: { model: resolvedModel, content: content },
+    });
 
-    // 4. Done
+    // 5. Done
     emitStage(r, "done");
   } catch (e) {
     emitStage(r, "error", { message: String(e.message || e) });
@@ -392,9 +496,51 @@ async function inlineChat(r) {
   r.finish();
 }
 
+async function llmProxy(r) {
+  applyCorsHeaders(r);
+
+  var auth = r.headersIn["Authorization"] || "";
+  if (!auth) {
+    r.headersOut["Content-Type"] = "application/json";
+    r.return(401, JSON.stringify({ error: "missing authorization" }));
+    return;
+  }
+
+  // Signal SSE handler: LLM request arrived
+  ngx.shared.llm_signals.set("start", String(Date.now()));
+
+  try {
+    var res = await withTimeout(
+      ngx.fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          Authorization: auth,
+          "Content-Type": "application/json",
+        },
+        body: r.requestText,
+      }),
+      LLM_TIMEOUT_MS,
+      "LLM proxy"
+    );
+
+    // Signal SSE handler: LLM response received
+    ngx.shared.llm_signals.set("end", String(Date.now()));
+
+    var responseText = await withTimeout(res.text(), 5000, "LLM proxy read");
+    r.headersOut["Content-Type"] = "application/json";
+    r.return(res.status, responseText);
+  } catch (e) {
+    ngx.shared.llm_signals.set("end", String(Date.now()));
+    r.headersOut["Content-Type"] = "application/json";
+    r.return(502, JSON.stringify({ error: String(e.message || e) }));
+  }
+}
+
 export default {
+  applyCorsHeaders,
   inlineChat,
   oobChat,
+  llmProxy,
   buildGuardrailScanUrl,
   buildGuardrailPromptUrl,
   getPromptResponseModel,

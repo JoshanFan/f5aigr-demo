@@ -1,10 +1,20 @@
 services:
-  f5ai-demo:
-    build: .
-    image: f5ai-guardrails-demo:latest
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
     environment:
       DEMO_PROJECT_ID: ${DEMO_PROJECT_ID:-}
       DEMO_API_TOKEN: ${DEMO_API_TOKEN:-}
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8080}
     ports:
       - "3000:3000"
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "8080:8080"
     restart: unless-stopped

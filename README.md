@@ -26,20 +26,20 @@ Two containers:
 | **Frontend** | Static file server (Node.js + `serve`) | 3000 |
 | **NGINX** | API proxy + SSE orchestration (nginx + njs) | 8080 |
 
-The browser loads the UI from the frontend container and sends API/SSE requests to the NGINX container. NGINX handles all communication with F5 AI Guardrails and OpenRouter — the browser never talks to them directly.
+```mermaid
+flowchart LR
+    Browser["Browser\n(localhost:3000)"]
+    Frontend["Frontend\nStatic Assets"]
+    NGINX["NGINX + njs\nOrchestration"]
+    Guardrails["F5 AI Guardrails\n(SaaS)"]
+    LLM["LLM Inference\n(OpenRouter)"]
 
-### Inline Mode Flow
-
-```text
-Browser -> NGINX -> Guardrails -> LLM -> Guardrails -> NGINX -> Browser
-```
-
-### OOB Mode Flow
-
-```text
-Browser -> NGINX -> Guardrails (pre-scan)
-  If allowed: NGINX -> OpenRouter (LLM) -> NGINX -> Browser
-  If blocked: NGINX -> Browser (blocked)
+    Browser -- "GET /" --> Frontend
+    Browser -- "API + SSE" --> NGINX
+    NGINX -- "Inline / OOB\nscan & prompt" --> Guardrails
+    Guardrails -. "Inline callback\n/v1/chat/completions" .-> NGINX
+    NGINX -- "OOB direct" --> LLM
+    Guardrails -- "Inline routing" --> LLM
 ```
 
 ## Prerequisites

@@ -12,7 +12,7 @@ const GUARDRAIL_CHECK_ENDPOINT = "/backend/v1/scans";
 
 function getApiBaseUrl() {
   const prefill = window.__F5_DEMO_PREFILL__;
-  const base = (prefill && prefill.apiBaseUrl) || "";
+  const base = (prefill && prefill.apiBaseUrl) || (window.location.origin + "/api");
   return base.replace(/\/+$/, "");
 }
 

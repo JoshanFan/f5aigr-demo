@@ -31,5 +31,6 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --quiet || git commit -m "mirror: sync from private repo"
+          git remote remove public 2>/dev/null || true
           git remote add public https://x-access-token:${{ secrets.PUBLIC_REPO_PAT }}@github.com/JoshanFan/f5aigr-demo.git
           git push public main --force

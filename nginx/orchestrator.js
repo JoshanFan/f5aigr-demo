@@ -106,6 +106,26 @@ function isBlocked(guardrailPayload) {
   return false;
 }
 
+function isReviewOutcome(guardrailPayload) {
+  var result =
+    guardrailPayload && typeof guardrailPayload === "object"
+      ? guardrailPayload.result || {}
+      : {};
+  var outcome = String(result.outcome || "").trim().toLowerCase();
+  var review = ["review", "warning", "warn", "flagged", "caution"];
+  for (var i = 0; i < review.length; i++) {
+    if (outcome === review[i]) return true;
+  }
+  return false;
+}
+
+function shouldStopOobOnGuardrailOutcome(guardrailPayload, strictMode) {
+  if (!strictMode) {
+    return false;
+  }
+  return isBlocked(guardrailPayload) || isReviewOutcome(guardrailPayload);
+}
+
 function parseBody(r) {
   try {
     var raw = r.requestText || r.requestBody || "";
@@ -340,6 +360,7 @@ async function oobChat(r) {
   }
 
   var upstream = r.variables.guardrails_upstream;
+  var strictGate = body.oobStrictGuardrailGate !== false;
 
   try {
     // 1. Guardrail pre-scan
@@ -352,9 +373,11 @@ async function oobChat(r) {
     );
     emitStage(r, "guardrail_result", { guardrail: guardrail });
 
-    // 2. Check blocked
-    if (isBlocked(guardrail)) {
-      emitStage(r, "blocked", { reason: "pre-scan blocked" });
+    // 2. Stop OOB flow unless Guardrails explicitly clears the request.
+    if (shouldStopOobOnGuardrailOutcome(guardrail, strictGate)) {
+      emitStage(r, "blocked", {
+        reason: isReviewOutcome(guardrail) ? "pre-scan review required" : "pre-scan blocked",
+      });
       emitStage(r, "done");
       r.finish();
       return;
@@ -545,4 +568,7 @@ export default {
   buildGuardrailPromptUrl,
   getPromptResponseModel,
   getLLMResponseModel,
+  isBlocked,
+  isReviewOutcome,
+  shouldStopOobOnGuardrailOutcome,
 };

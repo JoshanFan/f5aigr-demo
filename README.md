@@ -20,23 +20,63 @@ The platform runs as two containers:
 | **Frontend** | Static file server (Node.js + `serve`) | 3000 |
 | **NGINX** | API proxy + SSE orchestration (nginx + njs) | 8080 |
 
+```mermaid
+flowchart LR
+      Browser[Browser]
+      Frontend[Frontend Container<br/>Port 3000<br/>Static assets only]
+      Nginx[NGINX Container<br/>Port 8080<br/>/backend/v1/scans<br/>/backend/v1/prompts<br/>/inline/chat<br/>/oob/chat<br/>/v1/chat/completions]
+      Guardrails[F5 AI Guardrails]
+      OpenRouter[OpenRouter]
+
+      Browser -->|GET /| Frontend
+      Browser -->|API + SSE| Nginx
+      Nginx --> Guardrails
+      Nginx --> OpenRouter
 ```
-Browser ──────► NGINX (port 8080) ──────► F5 AI Guardrails ──────► LLM
-                  │                                                  │
-                  │◄──── SSE stream (real-time flow animation) ◄─────┘
-                  │
-                  ▼
-            Frontend (port 3000)
+
+### Runtime Flow
+
+The demo intentionally separates **UI delivery** from **API orchestration**:
+
+- The **frontend container** only serves static assets and runtime configuration.
+- The **NGINX container** is the integration point for Guardrails, SSE streaming, and LLM proxying.
+- The browser never talks directly to F5 AI Guardrails or OpenRouter.
+
+This separation keeps the demo easier to deploy, easier to reason about, and closer to how a front-end application is commonly placed in front of an API gateway or reverse proxy.
+
+### Inline Mode Sequence
+
+```text
+1. Browser -> NGINX         : POST /inline/chat
+2. NGINX -> Guardrails      : prompt inspection request
+3. Guardrails -> NGINX      : callback to /v1/chat/completions
+4. NGINX -> OpenRouter      : upstream LLM request
+5. OpenRouter -> NGINX      : model response
+6. NGINX -> Guardrails      : callback response returned
+7. Guardrails -> NGINX      : inspected final result
+8. NGINX -> Browser         : SSE stages + final result payload
+```
+
+### Out-of-Band Mode Sequence
+
+```text
+1. Browser -> NGINX         : POST /oob/chat
+2. NGINX -> Guardrails      : pre-scan request
+3. Guardrails -> NGINX      : scan decision
+4. If allowed, NGINX -> OpenRouter : direct LLM request
+5. OpenRouter -> NGINX      : model response
+6. NGINX -> Browser         : SSE stages + result payload
 ```
 
 ### How NGINX Fits In
 
 NGINX acts as the orchestration layer between the browser and the Guardrails API:
 
-1. **Proxies API requests** to the Guardrails upstream (`us1.calypsoai.app`) with connection pooling and keepalive
-2. **Streams SSE events** back to the browser so the UI can render each stage of the guardrail flow in real time
-3. **Handles CORS** for cross-origin requests from the frontend
-4. **Health check endpoint** at `/healthz` for monitoring
+1. **Terminates all browser-facing API requests** for scans, prompts, inline mode, and OOB mode
+2. **Calls the Guardrails upstream** (`us1.calypsoai.app`) and normalizes those responses for the UI
+3. **Exposes the LLM callback endpoint** used by Guardrails during inline mode
+4. **Streams SSE events** so the front-end animation follows real request stages instead of mocked timing
+5. **Handles CORS and health checks** for local and deployed environments
 
 All orchestration logic is implemented in [nginx/orchestrator.js](nginx/orchestrator.js) using NGINX njs (JavaScript scripting for NGINX).
 
@@ -91,6 +131,11 @@ Create a `.env` file (not committed to git):
 ```bash
 DEMO_PROJECT_ID=project-app-xxxxxxxx
 DEMO_API_TOKEN=your_guardrails_bearer_token
+```
+
+Optional:
+
+```bash
 API_BASE_URL=http://localhost:8080
 ```
 
@@ -102,11 +147,25 @@ docker compose up -d --build --force-recreate
 
 The environment variables are injected into `runtime-config.js` at container startup. Browser `sessionStorage` values override prefilled values if the user has already saved settings in that tab.
 
+If `API_BASE_URL` is omitted, the front end now automatically derives it from the current origin:
+
+- local example: `http://localhost:3000` -> `http://localhost:3000/api`
+- deployed example: `https://your-host` -> `https://your-host/api`
+
+This means production or demo deployments typically need a reverse proxy rule that forwards `/api/*` to the NGINX container and strips the `/api` prefix before sending the request upstream.
+
+Example public routing:
+
+```text
+https://your-host/      -> frontend container :3000
+https://your-host/api/* -> nginx container    :8080
+```
+
 ## Demo Usage
 
 1. Log in with the demo credentials
-2. Enter or select a prompt from the preset scenarios
-3. Choose **Inline** or **OOB** mode
+2. Choose **Inline** or **OOB** mode
+3. Enter or select a prompt from the preset scenarios
 4. Click **Send**
 5. Watch the real-time flow animation as the request passes through Guardrails
 6. Review the summary, scanner results, risk scores, and raw JSON payload
@@ -115,8 +174,8 @@ The environment variables are injected into `runtime-config.js` at container sta
 
 Default demo credentials (defined in `auth-utils.js`):
 
-- Username: `joshan`
-- Password: `F%AIP@ssw0rd`
+- Username: `admin`
+- Password: `F5aidemo`
 
 ## NGINX Proxy Details
 
@@ -127,8 +186,20 @@ Guardrails API upstream: `https://us1.calypsoai.app`
 NGINX configuration:
 
 - Listens on container port `8080`
-- Resolver: `8.8.8.8`, `1.1.1.1` (IPv4 only)
-- Upstream keepalive with connection reuse and SSL session caching
+- Resolver: `8.8.8.8`, `1.1.1.1` with IPv4-only resolution for external fetches
+- Exposes `/v1/chat/completions` as the callback endpoint Guardrails uses in inline mode
+- Uses `ngx.fetch()` in njs for Guardrails and OpenRouter calls
+
+### API Surface
+
+| Path | Purpose |
+|------|---------|
+| `/backend/v1/scans` | Browser-facing Guardrails scan passthrough |
+| `/backend/v1/prompts` | Browser-facing Guardrails prompt passthrough |
+| `/inline/chat` | Inline SSE orchestration endpoint |
+| `/oob/chat` | OOB SSE orchestration endpoint |
+| `/v1/chat/completions` | LLM proxy endpoint called by Guardrails |
+| `/healthz` | Health check |
 
 ### SSE Streaming
 
@@ -207,7 +278,9 @@ GitHub Actions workflow: `.github/workflows/deploy.yml`
 | `SSH_KEY` | SSH key for the deploy host |
 | `DEMO_PROJECT_ID` | Optional: frontend auto-prefill |
 | `DEMO_API_TOKEN` | Optional: frontend auto-prefill |
-| `API_BASE_URL` | NGINX endpoint URL for frontend API calls |
+| `API_BASE_URL` | Optional override for frontend API base URL |
+
+In most deployments, `API_BASE_URL` can be omitted if your public reverse proxy exposes the NGINX container at `/api` on the same host as the frontend.
 
 ## Troubleshooting
 
@@ -220,8 +293,18 @@ GitHub Actions workflow: `.github/workflows/deploy.yml`
 ### Connection shows "Disconnected"
 
 - Verify your **Project ID** and **API Token** are correct
-- Confirm `API Base URL` points to the NGINX container (e.g., `http://localhost:8080`)
+- Confirm `API Base URL` points to the NGINX API surface, not the static frontend container
+- If `Save` shows `API 404` or `received non-JSON response`, the request is reaching the wrong public route and returning HTML instead of Guardrails JSON
+- Verify `curl -i "$API_BASE_URL/backend/v1/scans"` reaches the NGINX API container rather than the frontend app
+- If you publish the app behind `https://your-host/api`, make sure that reverse proxy strips the `/api` prefix before forwarding to container port `8080`
 - Check outbound connectivity to `us1.calypsoai.app` from the container
+
+### Inline mode returns provider errors or hangs at LLM
+
+- Verify Guardrails is configured to call the public `/v1/chat/completions` endpoint exposed by this deployment
+- Confirm the public callback host is reachable from Guardrails SaaS
+- Review NGINX logs for timeout or callback errors: `docker compose logs nginx --tail=200`
+- If the environment has broken IPv6 egress, keep using the current `ngx.fetch()` implementation with resolver-based IPv4 handling
 
 ### Request hangs or times out
 

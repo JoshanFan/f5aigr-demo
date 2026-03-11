@@ -11,6 +11,15 @@ test("Dockerfile.frontend copies auth-utils.js", () => {
   );
 });
 
+test("Dockerfile.frontend copies api-utils.js", () => {
+  const dockerfile = readFileSync(new URL("./Dockerfile.frontend", import.meta.url), "utf8");
+  assert.match(
+    dockerfile,
+    /COPY\s+api-utils\.js\s+\./,
+    "Dockerfile.frontend must copy api-utils.js so app.js API helpers resolve in the container",
+  );
+});
+
 test("Dockerfile.frontend includes runtime prefill assets and entrypoint script", () => {
   const dockerfile = readFileSync(new URL("./Dockerfile.frontend", import.meta.url), "utf8");
   assert.match(

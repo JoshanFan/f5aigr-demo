@@ -118,6 +118,48 @@ test("applyCorsHeaders skips empty mapped origins", () => {
   assert.deepEqual(request.headersOut, {});
 });
 
+test("isBlocked returns true for blocked outcomes", () => {
+  const payload = {
+    result: {
+      outcome: "blocked",
+    },
+  };
+
+  assert.equal(orchestrator.isBlocked(payload), true);
+  assert.equal(orchestrator.isReviewOutcome(payload), false);
+});
+
+test("isReviewOutcome returns true for review outcomes", () => {
+  const payload = {
+    result: {
+      outcome: "review",
+    },
+  };
+
+  assert.equal(orchestrator.isBlocked(payload), false);
+  assert.equal(orchestrator.isReviewOutcome(payload), true);
+});
+
+test("shouldStopOobOnGuardrailOutcome returns false when strict gate is off", () => {
+  const payload = {
+    result: {
+      outcome: "review",
+    },
+  };
+
+  assert.equal(orchestrator.shouldStopOobOnGuardrailOutcome(payload, false), false);
+});
+
+test("shouldStopOobOnGuardrailOutcome returns true for review when strict gate is on", () => {
+  const payload = {
+    result: {
+      outcome: "review",
+    },
+  };
+
+  assert.equal(orchestrator.shouldStopOobOnGuardrailOutcome(payload, true), true);
+});
+
 test("orchestrator exports llmProxy function", () => {
   assert.equal(typeof orchestrator.llmProxy, "function");
 });

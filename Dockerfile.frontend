@@ -7,6 +7,7 @@ WORKDIR /app
 COPY index.html .
 COPY styles.css .
 COPY app.js .
+COPY api-utils.js .
 COPY auth-utils.js .
 COPY scan-utils.js .
 COPY runtime-config.js .

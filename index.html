@@ -292,7 +292,19 @@
                   </div>
                 </div>
 
-                <div class="flow-node flow-node--nginx" data-node="o-nginx">NGINX</div>
+                <div class="flow-node flow-node--nginx flow-node--nginx-oob" data-node="o-nginx">
+                  <span class="flow-node-title">NGINX</span>
+                  <label class="oob-gate-toggle" for="oobGuardrailGateToggle">
+                    <span class="oob-gate-toggle__copy">
+                      <span class="oob-gate-toggle__label">Strict Guardrail Gate</span>
+                      <span class="oob-gate-toggle__hint">Block blocked, review, warning, flagged, and caution outcomes</span>
+                    </span>
+                    <input id="oobGuardrailGateToggle" class="oob-gate-toggle__input" type="checkbox" checked />
+                    <span class="oob-gate-toggle__track" aria-hidden="true">
+                      <span class="oob-gate-toggle__thumb"></span>
+                    </span>
+                  </label>
+                </div>
 
                 <div class="flow-conn">
                   <div class="flow-step">
@@ -365,8 +377,12 @@
 
             <!-- Adversarial Test Samples -->
             <div class="panel scenario-panel">
-              <div class="section-head" style="margin-bottom: 14px;">
+              <div class="section-head scenario-head" style="margin-bottom: 14px;">
                 <h2>Adversarial Test Samples</h2>
+                <div class="scenario-language-toggle" role="group" aria-label="Sample language toggle">
+                  <button class="scenario-lang-btn is-active" data-language="zh" type="button" aria-pressed="true">中文</button>
+                  <button class="scenario-lang-btn" data-language="en" type="button" aria-pressed="false">EN</button>
+                </div>
               </div>
 
               <div class="scenario-grid" id="scenarioGrid">

@@ -28,16 +28,16 @@ Two containers:
 
 ```mermaid
 flowchart LR
-    Browser["Browser\n(localhost:3000)"]
-    Frontend["Frontend\nStatic Assets"]
-    NGINX["NGINX + njs\nOrchestration"]
-    Guardrails["F5 AI Guardrails\n(SaaS)"]
-    LLM["LLM Inference\n(OpenRouter)"]
+    Browser["Browser<br/>(localhost:3000)"]
+    Frontend["Frontend<br/>Static Assets"]
+    NGINX["NGINX + njs<br/>Orchestration"]
+    Guardrails["F5 AI Guardrails<br/>(SaaS)"]
+    LLM["LLM Inference<br/>(OpenRouter)"]
 
     Browser -- "GET /" --> Frontend
     Browser -- "API + SSE" --> NGINX
-    NGINX -- "Inline / OOB\nscan & prompt" --> Guardrails
-    Guardrails -. "Inline callback\n/v1/chat/completions" .-> NGINX
+    NGINX -- "Inline / OOB<br/>scan & prompt" --> Guardrails
+    Guardrails -. "Inline callback<br/>/v1/chat/completions" .-> NGINX
     NGINX -- "OOB direct" --> LLM
     Guardrails -- "Inline routing" --> LLM
 ```

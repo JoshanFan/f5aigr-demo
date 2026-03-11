@@ -2,6 +2,6 @@
 .env.local
 .worktrees/
 .claude/
-*.pen
+NOTES.md
 node_modules/
 package-lock.json

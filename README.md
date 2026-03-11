@@ -15,7 +15,7 @@ Interactive demo platform for **F5 AI Guardrails** — an AI runtime security so
 - **Inline Mode** — the prompt goes through Guardrails, which evaluates it and routes it to the LLM. The UI shows each stage in real time.
 - **Out-of-Band (OOB) Mode** — the prompt is pre-scanned first. If allowed, NGINX forwards it directly to the LLM.
 
-Both modes show scanner results, risk scores, and the full request/response payload.
+Both modes show the verdict, scanner breakdown, and the full request/response payload.
 
 ## Architecture
 
@@ -123,7 +123,7 @@ If `API_BASE_URL` is empty, the frontend auto-derives it from the current origin
 3. Enter or select a prompt
 4. Click **Send**
 5. Watch the real-time flow animation
-6. Review scanner results, risk scores, and raw JSON
+6. Review the verdict, scanner breakdown, and raw JSON
 
 ## Repository Layout
 

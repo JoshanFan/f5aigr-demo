@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mapPromptApiResult, mapScanApiResult } from "./scan-utils.js";
+import { mapPromptApiResult, mapScanApiResult, resolveScannerPolicyType } from "./scan-utils.js";
 
 test("maps cleared scan result to low-risk allow verdict", () => {
   const payload = {
@@ -109,4 +109,41 @@ test("maps out-of-band scan response with redacted input preview", () => {
   assert.equal(mapped.meta.sourceType, "oob");
   assert.equal(mapped.meta.apiPath, "/backend/v1/scans");
   assert.equal(mapped.meta.detailLabel, "Redaction");
+});
+
+test("resolveScannerPolicyType returns System when createdBy is system", () => {
+  const scanner = {
+    scannerId: "scanner-1",
+    scannerVersionMeta: {
+      createdBy: "system",
+    },
+  };
+
+  assert.equal(resolveScannerPolicyType(scanner, {}), "System");
+});
+
+test("resolveScannerPolicyType returns Custom when createdBy is non-system", () => {
+  const scanner = {
+    scannerId: "scanner-2",
+    scannerVersionMeta: {
+      createdBy: "auth0|68de02dd01074680cac6f03c",
+    },
+  };
+
+  assert.equal(resolveScannerPolicyType(scanner, {}), "Custom");
+});
+
+test("resolveScannerPolicyType falls back to scanner catalog versionMeta", () => {
+  const scanner = {
+    scannerId: "scanner-3",
+  };
+  const scannerCatalog = {
+    "scanner-3": {
+      versionMeta: {
+        createdBy: "system",
+      },
+    },
+  };
+
+  assert.equal(resolveScannerPolicyType(scanner, scannerCatalog), "System");
 });

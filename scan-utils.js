@@ -44,6 +44,46 @@ export function resolveScannerName(scanner, scannerCatalog) {
   return scannerId || "unknown_scanner";
 }
 
+function resolveScannerCreatedBy(scanner, scannerCatalog) {
+  if (!scanner || typeof scanner !== "object") {
+    return "";
+  }
+
+  const fromScannerVersionMeta =
+    scanner.scannerVersionMeta && typeof scanner.scannerVersionMeta === "object"
+      ? scanner.scannerVersionMeta.createdBy || scanner.scannerVersionMeta.create_by || ""
+      : "";
+  if (typeof fromScannerVersionMeta === "string" && fromScannerVersionMeta.trim()) {
+    return fromScannerVersionMeta.trim();
+  }
+
+  const scannerId = typeof scanner.scannerId === "string" ? scanner.scannerId : "";
+  if (scannerId && scannerCatalog && typeof scannerCatalog === "object") {
+    const scannerMeta = scannerCatalog[scannerId];
+    if (scannerMeta && typeof scannerMeta === "object") {
+      const fromCatalogVersionMeta =
+        scannerMeta.versionMeta && typeof scannerMeta.versionMeta === "object"
+          ? scannerMeta.versionMeta.createdBy || scannerMeta.versionMeta.create_by || ""
+          : "";
+      if (typeof fromCatalogVersionMeta === "string" && fromCatalogVersionMeta.trim()) {
+        return fromCatalogVersionMeta.trim();
+      }
+
+      const fromCatalog = scannerMeta.createdBy || scannerMeta.create_by || "";
+      if (typeof fromCatalog === "string" && fromCatalog.trim()) {
+        return fromCatalog.trim();
+      }
+    }
+  }
+
+  return "";
+}
+
+export function resolveScannerPolicyType(scanner, scannerCatalog) {
+  const createdBy = resolveScannerCreatedBy(scanner, scannerCatalog);
+  return createdBy.toLowerCase() === "system" ? "System" : "Custom";
+}
+
 function formatThreat(scanner, scannerCatalog) {
   const name = resolveScannerName(scanner, scannerCatalog);
   const data = scanner.data && typeof scanner.data === "object" ? scanner.data : {};

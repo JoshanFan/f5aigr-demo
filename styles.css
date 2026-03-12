@@ -1527,7 +1527,7 @@ textarea {
   color: #ffce72;
 }
 
-.scanner-reason {
+.scanner-policy-type {
   grid-column: 2;
   font-size: 11px;
   color: var(--text-muted);

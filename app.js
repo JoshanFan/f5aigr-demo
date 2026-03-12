@@ -1,5 +1,5 @@
 import { buildApiUrl, buildNonJsonApiErrorMessage, extractApiErrorMessage } from "./api-utils.js";
-import { mapPromptApiResult, mapScanApiResult, resolveScannerName } from "./scan-utils.js";
+import { mapPromptApiResult, mapScanApiResult, resolveScannerName, resolveScannerPolicyType } from "./scan-utils.js";
 import { isValidDemoLogin } from "./auth-utils.js";
 
 const SETTINGS_STORAGE_KEY = "f5_guardrails_demo_settings_v2";
@@ -495,9 +495,8 @@ function renderScannerDetails(scannerResults, scannerCatalog, overallLevel) {
 
   scannerResults.forEach((scanner) => {
     const name = resolveScannerName(scanner, scannerCatalog);
+    const policyType = resolveScannerPolicyType(scanner, scannerCatalog);
     const outcome = String(scanner.outcome || "unknown").toLowerCase();
-    const data = scanner.data && typeof scanner.data === "object" ? scanner.data : {};
-    const reason = data.reason || data.message || data.label || data.type || "";
 
     const isPassed = ["passed", "pass", "informational", "cleared", "allow", "allowed"].includes(outcome);
     const isBlocked = ["blocked", "block", "failed", "deny", "denied", "rejected"].includes(outcome);
@@ -525,12 +524,10 @@ function renderScannerDetails(scannerResults, scannerCatalog, overallLevel) {
 
     row.appendChild(info);
 
-    if (reason && !isPassed) {
-      const reasonEl = document.createElement("span");
-      reasonEl.className = "scanner-reason";
-      reasonEl.textContent = typeof reason === "string" ? reason : String(reason);
-      row.appendChild(reasonEl);
-    }
+    const policyEl = document.createElement("span");
+    policyEl.className = "scanner-policy-type";
+    policyEl.textContent = policyType;
+    row.appendChild(policyEl);
 
     dom.scannerList.appendChild(row);
   });

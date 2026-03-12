@@ -21,11 +21,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Remove private files
+      - name: Remove private files and swap credentials
+        env:
+          PUBLIC_DEMO_USERNAME: ${{ secrets.PUBLIC_DEMO_USERNAME }}
+          PUBLIC_DEMO_PASSWORD: ${{ secrets.PUBLIC_DEMO_PASSWORD }}
         run: |
           rm -rf .github/workflows/deploy.yml
           rm -rf .github/workflows/mirror.yml
           rm -f frontend.pen
+          sed -i 's/const DEMO_USERNAME = ".*"/const DEMO_USERNAME = "'"$PUBLIC_DEMO_USERNAME"'"/' auth-utils.js
+          sed -i 's/const DEMO_PASSWORD = ".*"/const DEMO_PASSWORD = "'"$PUBLIC_DEMO_PASSWORD"'"/' auth-utils.js
+          sed -i "s/\`admin\` \/ \`F5aidemo\`/\`$PUBLIC_DEMO_USERNAME\` \/ \`$PUBLIC_DEMO_PASSWORD\`/g" README.md
 
       - name: Push to public repo
         run: |

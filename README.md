@@ -44,6 +44,7 @@ flowchart TB
     LLM["LLM Inference<br/>(OpenRouter)"]
 
     subgraph Edge["NGINX Logic Layer"]
+        direction LR
         InlineEntry["/inline/chat<br/>SSE Orchestrator"]
         Callback["/v1/chat/completions<br/>Callback Endpoint"]
         Proxy["LLM Proxy"]
@@ -51,14 +52,14 @@ flowchart TB
 
     Browser -->|"GET /"| Frontend
     Browser -->|"POST /inline/chat"| InlineEntry
-    InlineEntry -->|"Prompt inspection"| Guardrails
-    Guardrails -. "Inline callback" .-> Callback
+    InlineEntry -->|"Prompt check"| Guardrails
+    Guardrails -. "Callback" .-> Callback
     Callback --> Proxy
-    Proxy -->|"Upstream inference"| LLM
-    LLM -->|"Model response"| Proxy
-    Proxy -. "Callback response" .-> Guardrails
-    Guardrails -->|"Inspected result"| InlineEntry
-    InlineEntry -->|"SSE + final payload"| Browser
+    Proxy -->|"LLM request"| LLM
+    LLM -->|"LLM response"| Proxy
+    Proxy -. "Callback reply" .-> Guardrails
+    Guardrails -->|"Final result"| InlineEntry
+    InlineEntry -->|"SSE result"| Browser
 ```
 
 ### OOB Mode Architecture
@@ -71,6 +72,7 @@ flowchart TB
     LLM["LLM Inference<br/>(OpenRouter)"]
 
     subgraph Edge["NGINX Logic Layer"]
+        direction LR
         OobEntry["/oob/chat<br/>SSE Orchestrator"]
         Direct["Direct LLM Call"]
     end
@@ -78,12 +80,12 @@ flowchart TB
     Browser -->|"GET /"| Frontend
     Browser -->|"POST /oob/chat"| OobEntry
     OobEntry -->|"Pre-scan"| Guardrails
-    Guardrails -->|"Allow / block"| OobEntry
-    OobEntry -->|"If allowed"| Direct
-    Direct -->|"Direct inference"| LLM
-    LLM -->|"Model response"| Direct
+    Guardrails -->|"Decision"| OobEntry
+    OobEntry -->|"Allow only"| Direct
+    Direct -->|"LLM request"| LLM
+    LLM -->|"LLM response"| Direct
     Direct --> OobEntry
-    OobEntry -->|"SSE + final payload"| Browser
+    OobEntry -->|"SSE result"| Browser
 ```
 
 ## Prerequisites

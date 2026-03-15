@@ -34,20 +34,56 @@ Two containers:
 | **Frontend** | Static file server (Node.js + `serve`) | 3000 |
 | **NGINX** | API proxy + SSE orchestration (nginx + njs) | 8080 |
 
+### Inline Mode Architecture
+
 ```mermaid
-flowchart LR
-    Browser["Browser<br/>(localhost:3000)"]
+flowchart TB
+    Browser["Browser"]
     Frontend["Frontend<br/>Static Assets"]
-    NGINX["NGINX + njs<br/>Orchestration"]
-    Guardrails["F5 AI Guardrails<br/>(SaaS)"]
+    Guardrails["F5 AI Guardrails"]
     LLM["LLM Inference<br/>(OpenRouter)"]
 
-    Browser -- "GET /" --> Frontend
-    Browser -- "API + SSE" --> NGINX
-    NGINX -- "Inline / OOB<br/>scan & prompt" --> Guardrails
-    Guardrails -. "Inline callback<br/>/v1/chat/completions" .-> NGINX
-    NGINX -- "OOB direct" --> LLM
-    Guardrails -- "Inline routing" --> LLM
+    subgraph Edge["NGINX Logic Layer"]
+        InlineEntry["/inline/chat<br/>SSE Orchestrator"]
+        Callback["/v1/chat/completions<br/>Callback Endpoint"]
+        Proxy["LLM Proxy"]
+    end
+
+    Browser -->|"GET /"| Frontend
+    Browser -->|"POST /inline/chat"| InlineEntry
+    InlineEntry -->|"Prompt inspection"| Guardrails
+    Guardrails -. "Inline callback" .-> Callback
+    Callback --> Proxy
+    Proxy -->|"Upstream inference"| LLM
+    LLM -->|"Model response"| Proxy
+    Proxy -. "Callback response" .-> Guardrails
+    Guardrails -->|"Inspected result"| InlineEntry
+    InlineEntry -->|"SSE + final payload"| Browser
+```
+
+### OOB Mode Architecture
+
+```mermaid
+flowchart TB
+    Browser["Browser"]
+    Frontend["Frontend<br/>Static Assets"]
+    Guardrails["F5 AI Guardrails"]
+    LLM["LLM Inference<br/>(OpenRouter)"]
+
+    subgraph Edge["NGINX Logic Layer"]
+        OobEntry["/oob/chat<br/>SSE Orchestrator"]
+        Direct["Direct LLM Call"]
+    end
+
+    Browser -->|"GET /"| Frontend
+    Browser -->|"POST /oob/chat"| OobEntry
+    OobEntry -->|"Pre-scan"| Guardrails
+    Guardrails -->|"Allow / block"| OobEntry
+    OobEntry -->|"If allowed"| Direct
+    Direct -->|"Direct inference"| LLM
+    LLM -->|"Model response"| Direct
+    Direct --> OobEntry
+    OobEntry -->|"SSE + final payload"| Browser
 ```
 
 ## Prerequisites
@@ -102,7 +138,7 @@ Open **http://localhost:3000** in your browser.
 - Click **Save** in Settings and wait for the status to show **Connected**
 - Choose **Inline** or **OOB** mode, enter a prompt, and click **Send**
 
-> **Note:** In Inline mode, the flow animation for steps 3–4 (LLM proxy) will be incomplete when running locally, because Guardrails SaaS cannot call back into `localhost`. The scan results and verdicts are unaffected — only the animation is partial. For the full flow animation, deploy the demo on a publicly reachable environment.
+> **Note:** In Inline mode, showing the full SSE flow for steps 3–4 (LLM proxy) requires more than just exposing the demo publicly. Guardrails must be able to call back into your NGINX `/v1/chat/completions` endpoint, and the Guardrails-side inference URL/Host must also be pointed back to that same reachable local endpoint. In practice, you need to expose the local callback path and configure Guardrails to send the inline inference traffic back to it. If either part is missing, the scan results and verdicts can still return, but the real step 3–4 flow feedback will be partial.
 
 ### Stop the demo
 

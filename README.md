@@ -135,7 +135,7 @@ curl -i http://localhost:8080/healthz
 
 Open **http://localhost:3000** in your browser.
 
-- Log in with the default credentials: `admin` / `F5aidemo`
+- Log in with the default credentials: `user` / `demo`
 - The **Project ID** and **API Token** should already be prefilled from your `.env`
 - Click **Save** in Settings and wait for the status to show **Connected**
 - Choose **Inline** or **OOB** mode, enter a prompt, and click **Send**
@@ -164,7 +164,7 @@ If `API_BASE_URL` is empty, the frontend auto-derives it from the current origin
 
 ## Demo Usage
 
-1. Log in (default: `admin` / `F5aidemo`)
+1. Log in (default: `user` / `demo`)
 2. Choose **Inline** or **OOB** mode
 3. Enter or select a prompt
 4. Click **Send**
